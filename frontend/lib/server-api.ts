@@ -1,7 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
-import { ApiError } from './api';
-import type { ExperimentMetricRow, Page, Place, PlaceDetail, PlaceProfile, User } from './api-types';
+import { ApiError, isPlaceScrap } from './api';
+import type { ExperimentMetricRow, Page, Place, PlaceDetail, PlaceProfile, Scrap, User } from './api-types';
 import { TOKEN_COOKIE } from './session';
 
 export function backendUrl(path: string): string {
@@ -31,6 +31,14 @@ export const getPlaceDetail = (id: number) => serverRequest<PlaceDetail>(`/place
 // These endpoints are reserved in the backend contract but are not implemented yet.
 export const getPlaceProfile = (id: number) => serverRequest<PlaceProfile>(`/places/${id}/profile`);
 export const getExperimentMetrics = () => serverRequest<ExperimentMetricRow[]>('/experiments');
+
+export const getMyScraps = (page: number, size: number) => serverRequest<Page<Scrap>>(`/scraps?page=${page}&size=${size}`);
+
+/** 이 장소를 찜한 스크랩의 id. 찜하지 않았으면 null. */
+export async function getPlaceScrapId(placeId: number): Promise<number | null> {
+  const { items } = await serverRequest<Page<Scrap>>(`/scraps?place_id=${placeId}`);
+  return items.find(isPlaceScrap)?.scrap_id ?? null;
+}
 
 /** 로그인한 사용자. 토큰이 없거나 만료됐으면 null. */
 export async function getMe(): Promise<User | null> {

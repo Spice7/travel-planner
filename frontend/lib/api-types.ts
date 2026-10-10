@@ -62,3 +62,39 @@ export type ExperimentMetricRow = {
 };
 export type Page<T> = { items: T[]; page: number; size: number; total: number };
 export type User = { user_id: number; email: string; name: string | null; role: string; created_at: string; updated_at: string };
+export type ScrapPlace = { place_id: number; name: string | null; category: Category; region: Region | null };
+export type Scrap = {
+  scrap_id: number;
+  user_id: number;
+  place_id: number | null;
+  review_id: number | null;
+  source_url: string | null;
+  title: string | null;
+  source_type: 'internal' | 'external';
+  status: string;
+  created_at: string;
+  updated_at: string;
+  place: ScrapPlace | null;
+};
+export type AspectScore = { aspect: string; label: string; goodness: number; mentions: number; evidence: string | null };
+export type ScrapRecommendationItem = {
+  rank: number;
+  place_id: number;
+  place_name: string | null;
+  category: string;
+  scrap_ids: number[];
+  fit: number;
+  matched: boolean;
+  review_count: number;
+  reason: string;
+  strengths: AspectScore[];
+  cautions: AspectScore[];
+};
+export type ScrapRecommendation = {
+  requirements: string;
+  interpreter: 'model' | 'keywords';
+  weights: { aspect: string; label: string; weight: number; keywords: string[] }[];
+  ignored_keywords: string[];
+  items: ScrapRecommendationItem[];
+  skipped: { scrap_id: number; reason: string }[];
+};

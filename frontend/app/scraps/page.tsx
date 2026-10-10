@@ -1,35 +1,23 @@
 import Link from 'next/link';
-import type { Page, Place } from '@/lib/api-types';
-import { getPlaces } from '@/lib/server-api';
+import { redirect } from 'next/navigation';
+import MyScraps from '@/components/MyScraps';
+import type { Page, Scrap, User } from '@/lib/api-types';
+import { getMe, getMyScraps } from '@/lib/server-api';
 
 export const dynamic = 'force-dynamic';
-const PAGE_SIZE = 20;
-const categoryName: Record<string, string> = { hotel: '숙소', restaurant: '식당', attraction: '관광지' };
+const PAGE_SIZE = 50;
 
-export default async function PlacesPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  const raw = (await searchParams).page;
-  const parsed = Number(raw ?? '1');
+export default async function MyScrapsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const parsed = Number((await searchParams).page ?? '1');
   const page = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1;
-  let data: Page<Place>;
-  try { data = await getPlaces(page, PAGE_SIZE); }
-  catch { return <div className="compare"><Link href="/">← 홈으로</Link><h1>장소 목록</h1><p role="alert">장소 목록을 불러오지 못했습니다. API 서버 실행 상태를 확인해 주세요.</p></div>; }
-  const pages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
-
-  return <div className="compare">
-    <Link href="/">← 홈으로</Link>
-    <h1>장소 목록</h1>
-    <p className="muted">전체 {data.total}곳 · 스크랩 저장 기능은 추후 연결합니다.</p>
-    {data.items.length ? <div className="scrap-list">{data.items.map((place) => (
-      <article key={place.place_id} className="scrap-card">
-        <b>{place.name || `장소 #${place.place_id}`}</b>
-        <small>{categoryName[place.category] ?? place.category} · 리뷰 {place.review_count}건</small>
-        {place.district ? <small>{place.district}</small> : null}
-      </article>
-    ))}</div> : <p>표시할 장소가 없습니다.</p>}
-    <div className="scrap-pagination">
-      {page > 1 ? <Link href={`/scraps?page=${page - 1}`}>이전</Link> : <span />}
-      <span>{page} / {pages}</span>
-      {page < pages ? <Link href={`/scraps?page=${page + 1}`}>다음</Link> : <span />}
-    </div>
-  </div>;
+  let me: User | null;
+  let data: Page<Scrap> | null = null;
+  try {
+    me = await getMe();
+    if (me) data = await getMyScraps(page, PAGE_SIZE);
+  } catch {
+    return <div className="compare"><Link href="/">← 홈으로</Link><h1>내 스크랩</h1><p role="alert">스크랩을 불러오지 못했습니다. API 서버 실행 상태를 확인해 주세요.</p></div>;
+  }
+  if (!me || !data) redirect(`/login?next=${encodeURIComponent(page > 1 ? `/scraps?page=${page}` : '/scraps')}`);
+  return <MyScraps data={data} />;
 }

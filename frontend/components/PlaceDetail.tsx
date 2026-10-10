@@ -1,10 +1,13 @@
 import Link from 'next/link';
 import EvidenceList from './EvidenceList';
+import ScrapButton from './ScrapButton';
 import type { PlaceDetail as Place, PlaceProfile } from '@/lib/api-types';
 
 const categoryName = { hotel: '숙소', restaurant: '식당', attraction: '관광지' };
 
-export default function PlaceDetail({ place, profile }: { place: Place; profile: PlaceProfile }) {
+type ScrapState = { loggedIn: boolean; scrapId: number | null };
+
+export default function PlaceDetail({ place, profile, scrap }: { place: Place; profile: PlaceProfile; scrap: ScrapState }) {
   return (
     <>
       <header className="appbar center">
@@ -48,6 +51,7 @@ export default function PlaceDetail({ place, profile }: { place: Place; profile:
           {!!place.tags.length && <p className="summary">태그: {place.tags.map((tag) => tag.tag_name).join(', ')}</p>}
         </section>
       </div>
+      <ScrapButton placeId={place.place_id} placeName={place.name} loggedIn={scrap.loggedIn} initialScrapId={scrap.scrapId} />
     </>
   );
 }

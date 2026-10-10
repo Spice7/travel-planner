@@ -7,7 +7,7 @@ export default async function AuthStatus() {
   const user = await getMe().catch(() => null);
   return <nav className="auth-nav">
     {user
-      ? <><span>{user.name || user.email}님</span><LogoutButton /></>
+      ? <><Link href="/scraps">내 스크랩</Link><span>{user.name || user.email}님</span><LogoutButton /></>
       : <Link href="/login">로그인</Link>}
   </nav>;
 }

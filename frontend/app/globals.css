@@ -132,7 +132,27 @@ a { color: inherit; text-decoration: none; }
 .info dt { color: var(--faint); }
 .info dd { margin: 0; }
 .cta { padding: 10px 16px 14px; border-top: 1px solid var(--line); flex: none; }
-.cta button { width: 100%; height: 50px; border: 0; border-radius: 14px; background: var(--ac); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+.cta button, .cta a { display: grid; place-items: center; width: 100%; height: 50px; border: 0; border-radius: 14px; background: var(--ac); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+.cta button.on { background: var(--ac-t); color: var(--ac); }
+.cta button:disabled { opacity: .6; cursor: default; }
+.cta .auth-error { margin: 0 0 8px; }
+
+/* my scraps */
+.scraps { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 16px; }
+.scraps .muted { margin: 0; }
+.scraps .link { color: var(--ac); font-weight: 600; }
+.scrap-rows { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.scrap-row { display: grid; grid-template-columns: 20px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; }
+.scrap-row input { width: 18px; height: 18px; margin: 0; accent-color: var(--ac); }
+.scrap-row b, .scrap-row small { display: block; }
+.scrap-row small { color: var(--faint); font-size: 12px; }
+.scrap-row button { border: 0; padding: 0; background: none; color: var(--faint); font-size: 13px; cursor: pointer; }
+.compare-form { display: grid; gap: 8px; }
+.compare-form textarea { width: 100%; padding: 12px 14px; border: 1px solid transparent; border-radius: 12px; background: var(--fill); color: var(--ink); font: inherit; resize: vertical; outline: none; }
+.compare-form textarea:focus { border-color: var(--ac); background: var(--sf); }
+.compare-form button { height: 46px; border: 0; border-radius: 14px; background: var(--ac); color: #fff; font-weight: 700; cursor: pointer; }
+.compare-form button:disabled { opacity: .45; cursor: default; }
+.factor { margin-right: 8px; }
 
 /* compare (발표용) */
 .compare { padding: 24px 20px; overflow-y: auto; }

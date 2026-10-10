@@ -1,4 +1,7 @@
-import type { AnalysisResult, AnalyzeRequest, EvidenceReview, ExperimentMetricRow, FitResult, Place, Page, RecommendationQuery } from './api-types';
+import type {
+  AnalysisResult, AnalyzeRequest, EvidenceReview, ExperimentMetricRow, FitResult, Place, Page, RecommendationQuery, Scrap,
+  ScrapRecommendation,
+} from './api-types';
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string) {
@@ -23,9 +26,16 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
       error?.code,
     );
   }
+  if (response.status === 204) return undefined as T;
   if (body === null) throw new ApiError('API 응답이 JSON이 아닙니다.', response.status);
   return body as T;
 }
+
+const json = (method: string, body: unknown): RequestInit => ({
+  method,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
 
 export function getRecommendations(query: RecommendationQuery): Promise<FitResult[]> {
   const params = new URLSearchParams();
@@ -42,11 +52,7 @@ export function getEvidence(placeId: number, aspect: string, sentiment?: string)
 }
 
 export function analyzeReview(request: AnalyzeRequest): Promise<AnalysisResult> {
-  return apiRequest<AnalysisResult>('/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-  });
+  return apiRequest<AnalysisResult>('/analyze', json('POST', request));
 }
 
 export function getExperiments(): Promise<ExperimentMetricRow[]> {
@@ -56,3 +62,15 @@ export function getExperiments(): Promise<ExperimentMetricRow[]> {
 export function getPlaces(query: Record<string, string>): Promise<Page<Place>> {
   return apiRequest<Page<Place>>(`/places?${new URLSearchParams(query)}`);
 }
+
+export const createPlaceScrap = (placeId: number, title: string | null) =>
+  apiRequest<Scrap>('/scraps', json('POST', { place_id: placeId, title }));
+export const deleteScrap = (scrapId: number) => apiRequest<void>(`/scraps/${scrapId}`, { method: 'DELETE' });
+export const getScrapsForPlace = (placeId: number) => apiRequest<Page<Scrap>>(`/scraps?place_id=${placeId}`);
+
+/** 스크랩한 장소끼리 요구사항으로 비교한다. 요구사항 해석에 파인튜닝 모델을 한 번 쓴다. */
+export const compareScraps = (scrapIds: number[], requirements: string) =>
+  apiRequest<ScrapRecommendation>('/recommendations', json('POST', { scrap_ids: scrapIds, requirements }));
+
+/** 장소 자체를 찜한 스크랩(리뷰·외부 글 스크랩 제외). */
+export const isPlaceScrap = (scrap: Scrap) => scrap.review_id === null && scrap.source_url === null;
