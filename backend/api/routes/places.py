@@ -3,8 +3,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.api.deps import Session
-from backend.repositories import places as place_repository
-from backend.schemas.places import EvidenceReview, PlaceDetailRead, PlaceProfile, PlaceRead
+from backend.schemas.places import EvidenceReview, PlaceDetailRead, PlacePage, PlaceProfile
 from backend.services import places as place_service
 
 router = APIRouter(prefix="/places", tags=["places"])
@@ -16,14 +15,13 @@ def _not_found() -> HTTPException:
     return HTTPException(status_code=404, detail="Place not found")
 
 
-@router.get("", response_model=list[PlaceRead])
+@router.get("", response_model=PlacePage)
 async def list_places(
     session: Session,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
-) -> list[PlaceRead]:
-    places = await place_repository.list_places(session, limit=limit, offset=offset)
-    return [PlaceRead.model_validate(place) for place in places]
+    page: Annotated[int, Query(ge=1)] = 1,
+    size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> PlacePage:
+    return await place_service.list_places(session, page=page, size=size)
 
 
 @router.get("/{place_id}", response_model=PlaceDetailRead)

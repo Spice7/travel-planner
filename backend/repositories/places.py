@@ -10,9 +10,35 @@ from backend.models.place_assets import PlaceImage, PlaceTag, Tag
 from backend.models.review import Review
 
 
-async def list_places(session: AsyncSession, *, limit: int, offset: int) -> list[Place]:
-    result = await session.scalars(select(Place).order_by(Place.place_id).limit(limit).offset(offset))
-    return list(result)
+def _place_info_query() -> Select:
+    """(Place, category_code, district_name, region_code)."""
+    return (
+        select(Place, PlaceCategory.category_code, District.district_name, Region.region_code)
+        .join(PlaceCategory, PlaceCategory.category_id == Place.category_id)
+        .outerjoin(District, District.district_id == Place.district_id)
+        .outerjoin(Region, Region.region_id == District.region_id)
+    )
+
+
+async def list_places(session: AsyncSession, *, limit: int, offset: int) -> list[tuple]:
+    """(Place, category_code, district_name, region_code, 리뷰 수, 대표 이미지 URL)."""
+    review_count = select(func.count()).select_from(Review).where(Review.place_id == Place.place_id).scalar_subquery()
+    main_image_url = (
+        select(PlaceImage.image_url)
+        .where(PlaceImage.place_id == Place.place_id, PlaceImage.is_main)
+        .order_by(PlaceImage.sort_order, PlaceImage.image_id)
+        .limit(1)
+        .scalar_subquery()
+    )
+    rows = await session.execute(
+        _place_info_query().add_columns(review_count, main_image_url)
+        .order_by(Place.place_id).limit(limit).offset(offset)
+    )
+    return [tuple(row) for row in rows]
+
+
+async def count_places(session: AsyncSession) -> int:
+    return await session.scalar(select(func.count()).select_from(Place)) or 0
 
 
 async def get_place(session: AsyncSession, place_id: int) -> Place | None:
@@ -20,13 +46,7 @@ async def get_place(session: AsyncSession, place_id: int) -> Place | None:
 
 
 async def place_detail_info(session: AsyncSession, place_id: int) -> tuple[Place, str, str | None, str | None] | None:
-    row = await session.execute(
-        select(Place, PlaceCategory.category_code, District.district_name, Region.region_code)
-        .join(PlaceCategory, PlaceCategory.category_id == Place.category_id)
-        .outerjoin(District, District.district_id == Place.district_id)
-        .outerjoin(Region, Region.region_id == District.region_id)
-        .where(Place.place_id == place_id)
-    )
+    row = await session.execute(_place_info_query().where(Place.place_id == place_id))
     found = row.one_or_none()
     return tuple(found) if found else None
 

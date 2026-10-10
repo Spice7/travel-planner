@@ -32,7 +32,7 @@ class PlaceTagRead(BaseModel):
     tag_name: str
 
 
-class PlaceDetailRead(PlaceRead):
+class PlaceListItem(PlaceRead):
     name: str | None
     category: str
     region: str | None
@@ -42,6 +42,16 @@ class PlaceDetailRead(PlaceRead):
     summary: str
     main_image_url: str | None
     review_count: int
+
+
+class PlacePage(BaseModel):
+    items: list[PlaceListItem]
+    page: int
+    size: int
+    total: int
+
+
+class PlaceDetailRead(PlaceListItem):
     images: list[PlaceImageRead]
     tags: list[PlaceTagRead]
 

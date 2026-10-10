@@ -3,14 +3,34 @@ from collections import defaultdict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.repositories import places as place_repository
+from backend.models.place import Place
 from backend.schemas.places import (
-    EvidenceReview, PlaceDetailRead, PlaceImageRead, PlaceProfile, PlaceRead,
+    EvidenceReview, PlaceDetailRead, PlaceImageRead, PlaceListItem, PlacePage, PlaceProfile, PlaceRead,
     PlaceTagRead, ProfileAspect, ProfileContext,
 )
 
 
 def _percent(part: int, whole: int) -> float:
     return round(part / whole * 100, 1) if whole else 0.0
+
+
+def _place_fields(place: Place, category: str, district: str | None, region: str | None) -> dict:
+    """목록과 상세가 함께 쓰는 장소 필드."""
+    return {
+        **PlaceRead.model_validate(place).model_dump(),
+        "name": place.place_name, "category": category, "district": district, "region": region,
+        "summary": place.intro_text or "",
+    }
+
+
+async def list_places(session: AsyncSession, *, page: int, size: int) -> PlacePage:
+    rows = await place_repository.list_places(session, limit=size, offset=(page - 1) * size)
+    items = [
+        PlaceListItem(**_place_fields(place, category, district, region),
+                      main_image_url=main_image_url, review_count=review_count)
+        for place, category, district, region, review_count, main_image_url in rows
+    ]
+    return PlacePage(items=items, page=page, size=size, total=await place_repository.count_places(session))
 
 
 async def get_place_detail(session: AsyncSession, place_id: int) -> PlaceDetailRead | None:
@@ -23,9 +43,7 @@ async def get_place_detail(session: AsyncSession, place_id: int) -> PlaceDetailR
     tags = [PlaceTagRead(category=tag_category, tag_name=tag_name)
             for tag_category, tag_name in await place_repository.place_tags(session, place_id)]
     return PlaceDetailRead(
-        **PlaceRead.model_validate(place).model_dump(),
-        name=place.place_name, category=category, district=district, region=region,
-        summary=place.intro_text or "",
+        **_place_fields(place, category, district, region),
         main_image_url=next((image.image_url for image in images if image.is_main), None),
         review_count=await place_repository.count_reviews(session, place_id),
         images=images, tags=tags,
