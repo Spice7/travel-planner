@@ -4,6 +4,7 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
 import httpx
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from backend.db.session import get_session
@@ -80,6 +81,31 @@ class PlaceDetailFrontendContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(place["tags"], [{"category": "theme", "tag_name": "전시"}])
         self.assertIsInstance(place["latitude"], float)
         self.assertEqual(missing.status_code, 404)
+
+    async def test_place_list_is_paged_with_fields_used_by_frontend(self):
+        async with self.engine.begin() as connection:
+            # Review 모델의 JSONB는 SQLite에서 만들 수 없어, 리뷰 수 집계에 쓰는 열만 둔다.
+            await connection.execute(text("CREATE TABLE reviews (review_id INTEGER PRIMARY KEY, place_id INTEGER)"))
+            await connection.execute(text("INSERT INTO reviews VALUES (1, 31), (2, 31)"))
+            await connection.execute(Place.__table__.insert(), {
+                "place_id": 32, "category_id": 1, "district_id": None,
+                "source": "tripadvisor", "source_place_id": "32", "place_name": "이미지 없는 곳",
+                "created_at": datetime.now(timezone.utc), "updated_at": datetime.now(timezone.utc),
+            })
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            first = (await client.get("/api/v1/places", params={"page": 1, "size": 1})).json()
+            second = (await client.get("/api/v1/places", params={"page": 2, "size": 1})).json()
+        self.assertEqual((first["page"], first["size"], first["total"]), (1, 1, 2))
+        place = first["items"][0]
+        self.assertEqual(place["name"], "뮤지엄 원")
+        self.assertEqual(place["category"], "attraction")
+        self.assertEqual(place["region"], "haeundae")
+        self.assertEqual(place["review_count"], 2)
+        self.assertEqual(place["main_image_url"], "https://example.com/main.jpg")
+        self.assertNotIn("images", place)
+        other = second["items"][0]
+        self.assertEqual((other["place_id"], other["review_count"], other["main_image_url"]), (32, 0, None))
+        self.assertIsNone(other["region"])
 
     async def test_evidence_context_is_display_text(self):
         with (
