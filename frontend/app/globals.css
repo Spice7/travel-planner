@@ -1,13 +1,13 @@
 :root {
   --page: #f2f3f5; --sf: #fff; --ink: #191b1f; --sub: #5a5f68; --faint: #989da6;
   --line: #eceef1; --fill: #f5f6f8; --ac: #0a86c9; --ac-t: #e7f4fb;
-  --land: #eef0ec; --sea: #d3e9f5; --road: #fff;
+  --land: #eef0ec; --sea: #d3e9f5; --road: #fff; --err: #d14343;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --page: #0e0f11; --sf: #17181b; --ink: #ecedef; --sub: #a5a9b0; --faint: #6d727a;
     --line: #25272b; --fill: #1f2124; --ac: #3ab2ee; --ac-t: #12293a;
-    --land: #1e2120; --sea: #12283a; --road: #2c2f33;
+    --land: #1e2120; --sea: #12283a; --road: #2c2f33; --err: #ff7b7b;
   }
 }
 
@@ -46,6 +46,21 @@ a { color: inherit; text-decoration: none; }
 .examples { width: 100%; display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; text-align: left; }
 .examples a { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-weight: 500; font-size: 14px; }
 .examples small { color: var(--faint); font-weight: 400; font-size: 12px; }
+
+/* auth */
+.auth-nav { display: flex; justify-content: flex-end; align-items: center; gap: 10px; height: 44px; padding: 0 16px; flex: none; font-size: 14px; color: var(--sub); }
+.auth-nav a { color: var(--ac); font-weight: 600; }
+.auth-nav button { border: 0; padding: 0; background: none; color: var(--sub); font-size: 14px; cursor: pointer; }
+.auth { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 28px 20px; }
+.auth label { display: grid; gap: 6px; font-size: 14px; font-weight: 500; }
+.auth label small { margin-left: 4px; color: var(--faint); font-size: 12px; font-weight: 400; }
+.auth input { height: 48px; padding: 0 14px; border: 1px solid transparent; border-radius: 12px; background: var(--fill); outline: none; }
+.auth input:focus { border-color: var(--ac); background: var(--sf); }
+.auth button { height: 50px; margin-top: 6px; border: 0; border-radius: 14px; background: var(--ac); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+.auth button:disabled { opacity: .5; cursor: default; }
+.auth-error { margin: 0; color: var(--err); font-size: 13px; }
+.auth-switch { margin: 4px 0 0; text-align: center; color: var(--sub); font-size: 14px; }
+.auth-switch a { color: var(--ac); font-weight: 600; }
 
 /* composer */
 .composer { display: flex; align-items: center; gap: 6px; margin: 8px 12px 14px; padding: 0 6px 0 16px; height: 46px; background: var(--fill); border-radius: 23px; flex: none; }

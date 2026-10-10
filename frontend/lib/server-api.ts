@@ -1,13 +1,21 @@
 import 'server-only';
+import { cookies } from 'next/headers';
 import { ApiError } from './api';
-import type { ExperimentMetricRow, Page, Place, PlaceDetail, PlaceProfile } from './api-types';
+import type { ExperimentMetricRow, Page, Place, PlaceDetail, PlaceProfile, User } from './api-types';
+import { TOKEN_COOKIE } from './session';
 
-export async function serverRequest<T>(path: string): Promise<T> {
+export function backendUrl(path: string): string {
   const backend = process.env.API_SERVER_URL?.replace(/\/$/, '');
   if (!backend) throw new ApiError('API_SERVER_URL이 설정되지 않았습니다.', 0);
+  return `${backend}/api/v1${path}`;
+}
+
+export async function serverRequest<T>(path: string): Promise<T> {
+  const url = backendUrl(path);
+  const token = (await cookies()).get(TOKEN_COOKIE)?.value;
   let response: Response;
   try {
-    response = await fetch(`${backend}/api/v1${path}`, { cache: 'no-store' });
+    response = await fetch(url, { cache: 'no-store', headers: token ? { Authorization: `Bearer ${token}` } : undefined });
   } catch {
     throw new ApiError('API 서버에 연결할 수 없습니다.', 0);
   }
@@ -23,3 +31,14 @@ export const getPlaceDetail = (id: number) => serverRequest<PlaceDetail>(`/place
 // These endpoints are reserved in the backend contract but are not implemented yet.
 export const getPlaceProfile = (id: number) => serverRequest<PlaceProfile>(`/places/${id}/profile`);
 export const getExperimentMetrics = () => serverRequest<ExperimentMetricRow[]>('/experiments');
+
+/** 로그인한 사용자. 토큰이 없거나 만료됐으면 null. */
+export async function getMe(): Promise<User | null> {
+  if (!(await cookies()).has(TOKEN_COOKIE)) return null;
+  try {
+    return await serverRequest<User>('/users/me');
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return null;
+    throw error;
+  }
+}

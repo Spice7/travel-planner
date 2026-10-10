@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import AuthStatus from '@/components/AuthStatus';
 import ChatInput from '@/components/ChatInput';
 
 const examples = [
@@ -11,6 +12,7 @@ const examples = [
 export default function Home() {
   return (
     <>
+      <AuthStatus />
       <div className="start">
         <Image src="/logo.png" alt="어디갈건호? 로고" width={250} height={213} priority />
         <h1>어디 갈지 고민될 땐,<br />리뷰한테 물어봐요</h1>

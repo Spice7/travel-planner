@@ -61,3 +61,4 @@ export type ExperimentMetricRow = {
   scores: Record<'base' | 'lora_gold' | 'qlora_gold' | 'lora_gs' | 'qlora_gs', number | null>;
 };
 export type Page<T> = { items: T[]; page: number; size: number; total: number };
+export type User = { user_id: number; email: string; name: string | null; role: string; created_at: string; updated_at: string };

@@ -16,8 +16,9 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     const error = body?.error;
+    const fallback = response.status === 401 ? '로그인이 필요합니다.' : 'API 요청에 실패했습니다. 서버 실행 상태를 확인해 주세요.';
     throw new ApiError(
-      typeof error?.message === 'string' ? error.message : 'API 요청에 실패했습니다. 서버 실행 상태를 확인해 주세요.',
+      typeof error?.message === 'string' ? error.message : fallback,
       response.status,
       error?.code,
     );
