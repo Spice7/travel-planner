@@ -1,8 +1,9 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from backend.api.deps import Session
+from backend.api.errors import ApiError
 from backend.schemas.places import EvidenceReview, PlaceDetailRead, PlacePage, PlaceProfile
 from backend.services import places as place_service
 
@@ -11,8 +12,8 @@ router = APIRouter(prefix="/places", tags=["places"])
 Sentiment = Literal["positive", "negative", "neutral"]
 
 
-def _not_found() -> HTTPException:
-    return HTTPException(status_code=404, detail="Place not found")
+def _not_found() -> ApiError:
+    return ApiError(404, "PLACE_NOT_FOUND", "장소를 찾을 수 없습니다.")
 
 
 @router.get("", response_model=PlacePage)

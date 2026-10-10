@@ -13,7 +13,7 @@ class ScrapCreate(BaseModel):
     @model_validator(mode="after")
     def require_target(self) -> "ScrapCreate":
         if self.place_id is None and self.review_id is None and self.source_url is None:
-            raise ValueError("place_id, review_id, or source_url is required")
+            raise ValueError("place_id, review_id, source_url 중 하나는 있어야 합니다.")
         return self
 
 

@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.api.errors import register_error_handlers
 from backend.api.router import api_router
 from backend.core.config import get_settings
 
 app = FastAPI(title="TripFit API")
+register_error_handlers(app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origin_list,

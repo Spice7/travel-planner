@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from backend.api.deps import CurrentUser
+from backend.api.errors import ApiError
 from backend.schemas.analysis import AnalysisResult, AnalyzeRequest
 from backend.services import analysis as analysis_service
 
@@ -13,6 +14,6 @@ async def analyze(request: AnalyzeRequest, user: CurrentUser) -> AnalysisResult:
     try:
         return await analysis_service.analyze(request)
     except analysis_service.ModelUnavailable as error:
-        raise HTTPException(status_code=503, detail=str(error)) from None
+        raise ApiError(503, "MODEL_UNAVAILABLE", str(error)) from None
     except analysis_service.ModelOutputInvalid as error:
-        raise HTTPException(status_code=422, detail=str(error)) from None
+        raise ApiError(422, "MODEL_OUTPUT_INVALID", str(error)) from None

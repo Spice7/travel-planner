@@ -1,10 +1,11 @@
 # [임시] 튜닝 전 원본 모델과 튜닝 모델의 추천 결과 비교. 비교가 끝나면 이 라우터를 지운다.
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.api.deps import Session
+from backend.api.errors import ApiError
 from backend.api.routes.recommendations import _csv_values
 from backend.schemas.recommendations import Category, Companion, PlaceRecommendationQuery, Walk
 from backend.services import model_compare
@@ -33,4 +34,4 @@ async def compare_recommendations(
     try:
         return await model_compare.compare(session, query)
     except SQLAlchemyError as error:
-        raise HTTPException(status_code=503, detail="Recommendation database is unavailable") from error
+        raise ApiError(503, "DATABASE_UNAVAILABLE", "추천에 필요한 DB에 연결할 수 없습니다.") from error

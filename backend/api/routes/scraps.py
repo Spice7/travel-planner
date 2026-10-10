@@ -1,17 +1,18 @@
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Query, Response
 
 from backend.api.deps import CurrentUser, Session
+from backend.api.errors import ApiError
 from backend.schemas.scraps import ScrapCreate, ScrapDetail, ScrapRead, ScrapUpdate
 from backend.services import scraps as scrap_service
 
 router = APIRouter(prefix="/scraps", tags=["scraps"])
 
 
-def _not_found() -> HTTPException:
+def _not_found() -> ApiError:
     # 다른 사용자의 스크랩도 존재 여부를 드러내지 않도록 404로 응답한다.
-    return HTTPException(status_code=404, detail="Scrap not found")
+    return ApiError(404, "SCRAP_NOT_FOUND", "스크랩을 찾을 수 없습니다.")
 
 
 @router.post("", status_code=201, response_model=ScrapRead)

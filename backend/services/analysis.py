@@ -28,18 +28,18 @@ def _model_name(model: str) -> str:
     settings = get_settings()
     name = {"base": settings.ollama_model_base, "lora": settings.ollama_model_lora, "qlora": settings.ollama_model}[model]
     if not name:
-        raise ModelUnavailable(f"Model '{model}' is not configured")
+        raise ModelUnavailable(f"'{model}' 모델이 설정되지 않았습니다.")
     return name
 
 
 def _parse(text: str) -> AnalysisResult:
     start, end = text.find("{"), text.rfind("}")
     if start < 0 or end <= start:
-        raise ModelOutputInvalid("Model output is not JSON")
+        raise ModelOutputInvalid("모델 출력이 JSON 형식이 아닙니다.")
     try:
         return AnalysisResult.model_validate(json.loads(text[start:end + 1]))
     except (json.JSONDecodeError, ValidationError) as error:
-        raise ModelOutputInvalid("Model output does not match the analysis schema") from error
+        raise ModelOutputInvalid("모델 출력이 분석 형식에 맞지 않습니다.") from error
 
 
 async def analyze(request: AnalyzeRequest, client: OllamaClient | None = None) -> AnalysisResult:
@@ -50,5 +50,5 @@ async def analyze(request: AnalyzeRequest, client: OllamaClient | None = None) -
     try:
         text = await (client or OllamaClient()).chat(_model_name(request.model), messages)
     except httpx.HTTPError as error:
-        raise ModelUnavailable("Analysis model server is unavailable") from error
+        raise ModelUnavailable("분석 모델 서버에 연결할 수 없습니다.") from error
     return _parse(text)

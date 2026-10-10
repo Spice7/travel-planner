@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from backend.api.deps import Session
+from backend.api.errors import ApiError
 from backend.schemas.users import LoginRequest, SignupRequest, TokenResponse, UserRead
 from backend.services import users as user_service
 
@@ -12,12 +13,12 @@ async def signup(request: SignupRequest, session: Session) -> UserRead:
     try:
         return await user_service.signup(session, request)
     except user_service.EmailAlreadyExists:
-        raise HTTPException(status_code=409, detail="Email already registered") from None
+        raise ApiError(409, "ALREADY_EXISTS", "이미 가입된 이메일입니다.") from None
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(request: LoginRequest, session: Session) -> TokenResponse:
     token = await user_service.login(session, request)
     if token is None:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise ApiError(401, "INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다.")
     return token

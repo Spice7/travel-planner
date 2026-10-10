@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.api.errors import ApiError
 from backend.core.security import decode_access_token
 from backend.db.session import get_session
 from backend.models.user import User
@@ -17,7 +18,7 @@ async def get_current_user(
     session: Session,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> User:
-    unauthorized = HTTPException(status_code=401, detail="Not authenticated", headers={"WWW-Authenticate": "Bearer"})
+    unauthorized = ApiError(401, "UNAUTHORIZED", "로그인이 필요합니다.", headers={"WWW-Authenticate": "Bearer"})
     if credentials is None:
         raise unauthorized
     user_id = decode_access_token(credentials.credentials)
