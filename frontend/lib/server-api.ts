@@ -1,6 +1,6 @@
 import 'server-only';
 import { ApiError } from './api';
-import type { ExperimentMetricRow, PlaceDetail, PlaceProfile } from './api-types';
+import type { ExperimentMetricRow, Page, Place, PlaceDetail, PlaceProfile } from './api-types';
 
 export async function serverRequest<T>(path: string): Promise<T> {
   const backend = process.env.API_SERVER_URL?.replace(/\/$/, '');
@@ -17,6 +17,7 @@ export async function serverRequest<T>(path: string): Promise<T> {
   return body as T;
 }
 
+export const getPlaces = (page: number, size: number) => serverRequest<Page<Place>>(`/places?page=${page}&size=${size}`);
 export const getPlaceDetail = (id: number) => serverRequest<PlaceDetail>(`/places/${id}`);
 
 // These endpoints are reserved in the backend contract but are not implemented yet.
