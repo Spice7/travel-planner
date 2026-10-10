@@ -177,7 +177,8 @@ class RouteTests(unittest.IsolatedAsyncioTestCase):
         for params in ({"category": "invalid"}, {"pri": "sea,unknown"}, {"limit": 51}, {"walk": "invalid"}):
             with self.subTest(params=params):
                 response = await self.client.get("/api/v1/recommendations", params=params)
-                self.assertEqual(response.status_code, 422)
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()["error"]["code"], "INVALID_REQUEST")
 
     async def test_fit_result_matches_frontend_shape(self):
         result = FitResult(
