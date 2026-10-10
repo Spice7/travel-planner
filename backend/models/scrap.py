@@ -1,14 +1,25 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Identity, String, Text, text
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Identity, Index, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.db.base import Base
 
 
+PLACE_SCRAP = "review_id IS NULL AND source_url IS NULL"  # 장소 자체를 찜한 스크랩
+REVIEW_SCRAP = "review_id IS NOT NULL"
+
+
 class Scrap(Base):
     __tablename__ = "scraps"
-    __table_args__ = (CheckConstraint("place_id IS NOT NULL OR review_id IS NOT NULL OR source_url IS NOT NULL", name="ck_scraps_target"),)
+    __table_args__ = (
+        CheckConstraint("place_id IS NOT NULL OR review_id IS NOT NULL OR source_url IS NOT NULL", name="ck_scraps_target"),
+        # 종류별 중복 방지: 같은 장소 찜, 같은 리뷰 저장만 막고 같은 장소의 다른 리뷰·글은 허용한다.
+        Index("ux_scraps_user_place", "user_id", "place_id", unique=True,
+              postgresql_where=text(PLACE_SCRAP), sqlite_where=text(PLACE_SCRAP)),
+        Index("ux_scraps_user_review", "user_id", "review_id", unique=True,
+              postgresql_where=text(REVIEW_SCRAP), sqlite_where=text(REVIEW_SCRAP)),
+    )
 
     scrap_id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"))
