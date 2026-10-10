@@ -128,7 +128,7 @@ Sep 29, 2026 · @Dorothy
 
 ## 리뷰 분석·추천 API
 
-리뷰 분석기(`/analyzer`)와 추천(`/recommendations`), 실험실(`/lab`) 화면이 사용합니다. 모두 인증 없이 호출합니다.
+리뷰 분석기(`/analyzer`)와 추천(`/recommendations`), 실험실(`/lab`) 화면이 사용합니다. `POST /api/analyze`만 로그인이 필요하고(모델 GPU 보호), 나머지는 인증 없이 호출합니다.
 
 | Method | Path | 설명 | 대체할 Mock |
 | --- | --- | --- | --- |
@@ -238,6 +238,14 @@ Sep 29, 2026 · @Dorothy
 
 `scraps`, `scrap_contents` 테이블 기준입니다. 모두 인증이 필요하며, 본인 스크랩만 조회·삭제할 수 있습니다(다른 사용자 것은 `404`).
 
+스크랩은 담는 값에 따라 세 종류이고, 중복 규칙이 다릅니다. 같은 장소의 다른 리뷰·다른 글은 계속 저장할 수 있습니다.
+
+| 종류 | 담는 값 | 막는 중복 (`409 ALREADY_EXISTS`) | DB 고유 인덱스 |
+| --- | --- | --- | --- |
+| 장소 찜 | `place_id`만 | 같은 장소를 다시 찜 ("이미 스크랩한 장소입니다.") | `ux_scraps_user_place` |
+| 리뷰 저장 | `review_id` (+ 그 리뷰의 장소) | 같은 리뷰를 다시 저장 ("이미 스크랩한 리뷰입니다.") | `ux_scraps_user_review` |
+| 외부 글 | `source_url` (+ 연결한 장소) | 미정 (외부 글 스크랩 단계에서 정함) | — |
+
 | Method | Path | 설명 |
 | --- | --- | --- |
 | POST | `/api/scraps` | 스크랩 생성 |
@@ -257,7 +265,9 @@ Sep 29, 2026 · @Dorothy
 | `source_url` | string, 최대 1000자 | 조건부 | 외부 링크 |
 | `title` | string, 최대 300자 | 아니오 | 표시 제목 |
 
-`source_type`은 서버가 정합니다. `source_url`만 있으면 `external`, 그 외에는 기본값 `internal`입니다. `status`는 기본값 `ready`로 시작합니다.
+- `source_type`은 서버가 정하며 요청 값은 무시합니다. `source_url`이 있으면 `external`, 없으면 `internal`입니다. `status`는 기본값 `ready`로 시작합니다.
+- 리뷰 저장은 `place_id`를 비워 두면 그 리뷰의 장소로 채웁니다. 다른 장소를 지정하면 `400 INVALID_REQUEST`.
+- 없는 장소·리뷰는 `404 PLACE_NOT_FOUND`·`404 REVIEW_NOT_FOUND`.
 
 응답 `201`:
 
@@ -272,16 +282,22 @@ Sep 29, 2026 · @Dorothy
   "source_type": "internal",
   "status": "ready",
   "created_at": "2026-09-29T14:20:00",
-  "updated_at": "2026-09-29T14:20:00"
+  "updated_at": "2026-09-29T14:20:00",
+  "place": { "place_id": 12, "name": "감천문화마을", "category": "attraction", "region": "west" }
 }
 ```
+
+`place`는 목록에서 장소를 다시 조회하지 않도록 함께 내리는 요약이며, 장소가 없는 외부 링크는 `null`입니다.
 
 ### GET /api/scraps
 
 | Query | 설명 |
 | --- | --- |
 | `source_type` | `internal` \| `external` 필터 |
-| `page`, `size` | 페이지네이션, `created_at` 최신순 |
+| `place_id` | 이 장소의 스크랩만 (장소 상세에서 찜 여부 확인) |
+| `page`, `size` | 페이지네이션(기본 20, 최대 100), `created_at` 최신순 |
+
+응답 `200`: `Scrap` 목록(페이지 형식 `{ items, page, size, total }`).
 
 ### GET /api/scraps/{scrap\_id}
 
@@ -294,6 +310,17 @@ Sep 29, 2026 · @Dorothy
 ### DELETE /api/scraps/{scrap\_id}
 
 응답 `204`. `scrap_contents`는 FK `ON DELETE CASCADE`로 함께 삭제됩니다.
+
+### POST /api/recommendations (스크랩 비교 추천)
+
+로그인이 필요합니다. 내 스크랩의 장소들을 자연어 요구사항으로 비교해 순위를 매깁니다. 요구사항 해석에 파인튜닝 모델을 한 번 쓰고, 모델을 쓸 수 없으면 키워드 규칙으로 대신합니다(`interpreter`).
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `scrap_ids` | int[], 1~50개 | 예 | 비교할 스크랩. 같은 장소의 스크랩은 한 장소로 묶습니다 |
+| `requirements` | string, 최대 500자 | 예 | 예: "부모님과 가는데 계단은 피하고 바다 전망이 좋았으면 해요" |
+
+응답 `200`: `requirements`, `interpreter`(`model` \| `keywords`), `weights`(해석한 aspect와 가중치), `ignored_keywords`(신경 쓰지 않는다고 한 것), `items`(순위, 장소, `fit`, 이유, `strengths`·`cautions`와 근거 구절), `skipped`(장소를 알 수 없어 뺀 스크랩). 내 스크랩이 아니면 `404 SCRAP_NOT_FOUND`.
 
 ## 데이터 모델
 
@@ -326,9 +353,9 @@ Sep 29, 2026 · @Dorothy
 구현 전에 팀이 정해야 할 항목입니다.
 
 - [ ] **필드 표기 통일**: `types/review.ts`는 snake\_case지만 `types/place.ts`는 camelCase(`reviewCount`, `placeId`, `contextSatisfaction`)입니다. 이 명세는 snake\_case로 적었으므로 프론 타입을 바꿀지, API에서 camelCase로 내릴지 정해야 합니다.
-- [ ] **`user_scraps`와 `scraps` 중복**: 두 테이블 모두 장소 스크랩을 담을 수 있습니다. 이 명세는 `scraps`만 사용합니다.
-- [ ] **중복 스크랩**: `scraps`에는 `(user_id, place_id)` UNIQUE가 없어 같은 장소를 여러 번 저장할 수 있습니다. 막을지(`409`) 정해야 합니다.
-- [ ] **인증 방식**: JWT Bearer로 가정했습니다. 쿠키 세션이나 소셜 로그인이 필요하면 인증 섹션을 바꿔야 합니다.
+- [x] **`user_scraps`와 `scraps` 중복**: `scraps`만 사용하고 `user_scraps`는 삭제했습니다(`backend/db/migrations/001_scraps_dedup.sql`).
+- [x] **중복 스크랩**: 장소 찜과 리뷰 저장은 종류별로 `409`로 막습니다(스크랩 API 참고). 외부 글 규칙은 외부 글 스크랩 단계에서 정합니다.
+- [x] **인증 방식**: 백엔드는 JWT Bearer입니다. 프론트는 토큰을 httpOnly 쿠키에 보관하고, Next 미들웨어가 `/api/v1/*` 요청에 `Authorization` 헤더로 붙입니다.
 - [ ] **분석 모델**: 프론 주석은 Qwen3-8B, 평가 설정(`evaluation/config.json`)은 Qwen3-4B QLoRA입니다. `/api/analyze`가 올릴 모델과 GPU 메모리 예산을 정해야 합니다.
 - [ ] **Region 코드**: 프론의 `haeundae` 등 5개 코드가 `regions.region_code`에 같은 값으로 적재돼 있어야 합니다.
 - [ ] **`family` 동행 유형**: 타입에는 있지만 추천 조건 폼(`COMPANIONS`)에는 없습니다.

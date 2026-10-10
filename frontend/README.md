@@ -1,8 +1,12 @@
 # 어디갈건호 프론트
 
-## 장소 목록
+## 장소 목록과 스크랩
 
-`/scraps`는 전체 장소 목록을 읽기 전용으로 표시합니다. 스크랩 저장 목록은 아직 아닙니다. 데이터는 백엔드의 `GET /api/v1/places?page=&size=`에서 받고, 프론트는 DB에 직접 접속하지 않습니다.
+- `/places`: 전체 장소 목록입니다. 장소를 누르면 상세(`/place/{id}`)로 이동합니다.
+- `/place/{id}`: 하단 버튼으로 장소를 스크랩(찜)하거나 취소합니다. 로그인하지 않았으면 로그인 화면으로 보냅니다.
+- `/scraps`: 내 스크랩 목록입니다(로그인 필요). 2곳 이상 고르고 요구사항을 적으면 `POST /api/v1/recommendations`로 비교 추천을 받습니다. 비교 한 번에 파인튜닝 모델을 한 번 씁니다.
+
+데이터는 모두 백엔드 `/api/v1`에서 받고, 프론트는 DB에 직접 접속하지 않습니다.
 
 ```bash
 cd frontend
@@ -10,7 +14,7 @@ npm install
 npm run dev
 ```
 
-`frontend/.env.local`에 백엔드 주소(`API_SERVER_URL`, [`.env.example`](.env.example) 참고)를 넣고, 백엔드를 먼저 실행한 뒤 `http://localhost:3000/scraps`에서 목록을 확인하세요. 스크랩 저장 연결은 이후 작업입니다.
+`frontend/.env.local`에 백엔드 주소(`API_SERVER_URL`, [`.env.example`](.env.example) 참고)를 넣고, 백엔드를 먼저 실행한 뒤 `http://localhost:3000`을 여세요. 외부 글 스크랩은 이후 작업입니다.
 
 ## 로그인
 
