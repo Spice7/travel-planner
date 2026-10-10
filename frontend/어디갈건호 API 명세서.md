@@ -22,12 +22,18 @@ Sep 29, 2026 · @Dorothy
 
 | HTTP | code 예시 | 의미 |
 | --- | --- | --- |
-| 400 | `INVALID_REQUEST` | 필수 필드 누락, 허용되지 않은 값 |
+| 400 | `INVALID_REQUEST` | 필수 필드 누락, 허용되지 않은 값 (입력 검증 실패도 422가 아니라 400) |
 | 401 | `UNAUTHORIZED` | 토큰 없음 또는 만료 |
+| 401 | `INVALID_CREDENTIALS` | 로그인 시 이메일 또는 비밀번호 불일치 |
 | 403 | `FORBIDDEN` | 다른 사용자의 리소스 접근 |
-| 404 | `PLACE_NOT_FOUND`, `SCRAP_NOT_FOUND` | 리소스 없음 |
+| 404 | `PLACE_NOT_FOUND`, `SCRAP_NOT_FOUND`, `METRICS_NOT_FOUND`, `NOT_FOUND` | 리소스 없음 (`NOT_FOUND`는 없는 경로) |
 | 409 | `ALREADY_EXISTS` | 이메일 중복, 중복 스크랩 |
-| 503 | `MODEL_UNAVAILABLE` | 분석 모델이 로드되지 않음 |
+| 422 | `MODEL_OUTPUT_INVALID` | 모델 출력이 분석 형식에 맞지 않음 |
+| 500 | `INTERNAL_ERROR` | 처리되지 않은 서버 오류 |
+| 503 | `MODEL_UNAVAILABLE` | 분석 모델이 설정되지 않았거나 모델 서버에 연결할 수 없음 |
+| 503 | `DATABASE_UNAVAILABLE` | 추천에 필요한 DB에 연결할 수 없음 |
+
+`message`는 사용자에게 그대로 보여 줄 한국어 문장입니다. 백엔드 구현은 `backend/api/errors.py`에 있습니다.
 
 ### 목록 페이지네이션
 
