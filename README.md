@@ -228,7 +228,7 @@ fit(장소)        = 50 + Σ w × (goodness − 50) / Σ w        (장소 리뷰
 | `OLLAMA_MODEL_BASE`, `OLLAMA_MODEL_LORA` | `/analyze`에서 모델을 바꿔 비교할 때 |
 | `RECOMMENDATION_MODEL_TIMEOUT_SECONDS` | 요구사항 해석 제한 시간, 넘기면 키워드 규칙으로 대체 |
 | `EXPERIMENTS_METRICS_PATH` | `/experiments`가 읽을 평가 결과 JSON |
-| `API_SERVER_URL` (프론트) | Next.js가 프록시할 FastAPI 주소 |
+| `API_SERVER_URL` (프론트) | Next.js가 프록시할 FastAPI 주소. [`frontend/.env.example`](frontend/.env.example)을 `frontend/.env.local`로 복사해 채웁니다 |
 
 </details>
 
@@ -243,6 +243,7 @@ travel-planner
 │   ├── services/       추천·분석·프로필 로직
 │   ├── repositories/   DB 조회
 │   ├── models/         SQLAlchemy 모델
+│   ├── db/             DB 세션, migrations/ (덤프 이후의 구조 변경 SQL)
 │   └── clients/        Ollama 클라이언트
 ├── frontend/           Next.js 프론트엔드 (app/, components/, lib/)
 ├── model/              모델 의존성(torch 등)을 분리한 uv 프로젝트
@@ -251,28 +252,61 @@ travel-planner
 ├── datasets/v2/        학습·검증·테스트 데이터셋과 manifest
 ├── evaluation/         평가 파이프라인 (자동 지표, Judge, 인간 평가, 지연 측정)
 ├── deploy/             HF 어댑터 폴더, Ollama 병합·GGUF·Modelfile
-├── docs/               라벨링 가이드, DB 스키마, 평가 보고서
-└── tests/              추천·프론트 계약 테스트
+├── docs/               라벨링 가이드, DB 스키마, 평가 보고서 (dumps/는 git 제외 DB 덤프 자리)
+└── tests/              추천·장소 응답·오류 형식·스크랩 API 테스트
 ```
 
 <br />
 
 ## 🚀 실행 방법
 
-Python 3.12 이상, [`uv`](https://docs.astral.sh/uv/)를 쓰며 모든 명령은 저장소 루트에서 실행합니다.
+Python 3.12 이상, [`uv`](https://docs.astral.sh/uv/), Node.js, PostgreSQL 16, [Ollama](https://ollama.com/)를 쓰며 모든 명령은 저장소 루트에서 실행합니다.
+
+### 1. DB 준비
+
+DB 덤프는 저장소에 넣지 않습니다(`docs/dumps/`는 git 제외). 공유받은 덤프를 `docs/dumps/`에 두고, 앱 계정과 DB를 만든 뒤(예: `CREATE ROLE <아이디> LOGIN PASSWORD '...';`, `CREATE DATABASE "postDB" OWNER <아이디>;`) 복원합니다. 그다음 덤프 이후의 구조 변경을 [`backend/db/migrations/`](backend/db/migrations)의 번호 순서대로 적용합니다.
+
+```bash
+psql -h localhost -U <아이디> -d postDB -v ON_ERROR_STOP=1 -f docs/dumps/<덤프 파일>.sql
+psql -h localhost -U <아이디> -d postDB -v ON_ERROR_STOP=1 -f backend/db/migrations/001_scraps_dedup.sql
+```
+
+### 2. 설정
+
+```bash
+cp .env.example .env                           # DATABASE_URL, JWT_SECRET, OLLAMA_* 채우기
+cp frontend/.env.example frontend/.env.local   # API_SERVER_URL (기본 http://127.0.0.1:8000)
+```
+
+리뷰 분석·추천 이유·요구사항 해석은 Ollama 서버(`OLLAMA_BASE_URL`)에 `OLLAMA_MODEL`이 받아져 있어야 동작합니다. 모델을 쓸 수 없으면 추천은 키워드 규칙과 라벨 기반 문장으로 대신합니다.
+
+### 3. 실행
+
+[mise](https://mise.jdx.dev/)가 있으면 백엔드(8000)와 프론트엔드(3000)를 한 번에 띄웁니다. 처음 한 번은 `mise trust`, `mise install`이 필요합니다.
+
+```bash
+mise run dev
+```
+
+mise 없이 따로 띄울 때:
 
 ```bash
 # 백엔드
 uv sync
-cp .env.example .env        # DATABASE_URL, JWT_SECRET, OLLAMA_* 채우기
-uv run uvicorn backend.main:app --reload
+uv run uvicorn backend.main:app --reload --port 8000
 ```
 
 ```bash
 # 프론트엔드
-cd frontend && npm install
-API_SERVER_URL=http://127.0.0.1:8000 npm run dev
+cd frontend && npm install && npm run dev
 ```
+
+```bash
+# 테스트 (GPU·실제 DB를 쓰지 않음)
+uv run python -m unittest discover -s tests
+```
+
+### 4. 모델 평가
 
 ```bash
 # 모델 의존성(torch 등)은 별도 프로젝트라 필요할 때만 설치합니다
