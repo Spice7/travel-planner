@@ -41,3 +41,5 @@ evaluation/runs/
 
 # DB 덤프 파일
 docs/dumps/
+# 지울 파일을 옮겨 두는 로컬 보관함 (커밋하지 않는다)
+backup/
