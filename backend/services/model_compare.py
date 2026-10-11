@@ -26,10 +26,10 @@ from backend.core.config import get_settings
 from backend.schemas.recommendations import PlaceRecommendationQuery
 from backend.services import recommendations as recommendation_service
 from backend.services.analysis import SYSTEM_PROMPT
+from backend.services.label_validation import load_vocab, validate
 
 LABEL_DIR = Path("datas/model_compare/out")  # datas/*/out/은 커밋하지 않는다
 BASE_MODEL = "exaone3.5:2.4b"
-SENTIMENTS = {"positive", "negative", "neutral"}
 
 CONDITIONS = {
     "base": {"name": "원본", "detail": "exaone3.5:2.4b · 학습 프롬프트"},
@@ -38,56 +38,12 @@ CONDITIONS = {
 }
 
 
-async def load_vocab(session: AsyncSession) -> tuple[dict[str, dict[str, set[str]]], list[str]]:
-    """({카테고리: {aspect: 허용 attribute}}, 동행 유형 코드)."""
-    rows = await session.execute(text(
-        "select pc.category_code, a.aspect_name, av.value_name from aspects a"
-        " join place_categories pc using (category_id)"
-        " join aspect_values av on av.aspect_id = a.aspect_id and av.is_active where a.is_active"
-    ))
-    vocab: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
-    for category, aspect, value in rows:
-        vocab[category][aspect].add(value)
-    companions = (await session.execute(text(
-        "select companion_code from companion_types where is_active order by companion_type_id"
-    ))).scalars().all()
-    return vocab, list(companions)
-
-
 def _system_prompt(condition: str, category: str, vocab: dict[str, dict[str, set[str]]], companions: list[str]) -> str:
     if condition != "base_labels":
         return SYSTEM_PROMPT
     aspects = "\n".join(f"- {aspect}: {', '.join(sorted(values))}" for aspect, values in sorted(vocab[category].items()))
     return (f"{SYSTEM_PROMPT}\n\n[허용 값]\n카테고리 {category}의 category(aspect)와 attribute:\n{aspects}\n"
             f"sentiment: positive, negative, neutral\ntraveler_context: {', '.join(companions)}")
-
-
-def validate(output: str, review: str, category: str, vocab: dict[str, dict[str, set[str]]], companions: list[str]) -> dict:
-    """서비스 라벨과 같은 자동 검증: JSON, 허용 aspect·attribute·sentiment, evidence가 원문에 그대로 있는지."""
-    start, end = output.find("{"), output.rfind("}")
-    try:
-        data = json.loads(output[start:end + 1]) if 0 <= start < end else None
-    except json.JSONDecodeError:
-        data = None
-    if not isinstance(data, dict):
-        return {"parse_ok": False, "aspects": [], "rejected": {}, "traveler_context": []}
-    aspects, rejected = [], defaultdict(int)
-    for item in data.get("aspects") if isinstance(data.get("aspects"), list) else []:
-        if not isinstance(item, dict):
-            rejected["not_object"] += 1
-        elif item.get("category") not in vocab[category]:
-            rejected["unknown_aspect"] += 1
-        elif item.get("attribute") not in vocab[category][item["category"]]:
-            rejected["unknown_attribute"] += 1
-        elif item.get("sentiment") not in SENTIMENTS:
-            rejected["unknown_sentiment"] += 1
-        elif not isinstance(item.get("evidence"), str) or not item["evidence"].strip() or item["evidence"] not in review:
-            rejected["evidence_not_in_review"] += 1
-        else:
-            aspects.append({key: item[key] for key in ("category", "attribute", "sentiment", "evidence")})
-    contexts = data.get("traveler_context") if isinstance(data.get("traveler_context"), list) else []
-    return {"parse_ok": True, "aspects": aspects, "rejected": dict(rejected),
-            "traveler_context": [c for c in contexts if c in companions]}
 
 
 def _label_path(condition: str) -> Path:

@@ -59,7 +59,7 @@ Sep 29, 2026 · @Dorothy
 | `q` | string | 아니오 | 장소명 부분 검색 |
 | `page`, `size` | int | 아니오 | 페이지네이션 |
 
-`category`, `region`, `q`는 **아직 구현되지 않았습니다.** 지금은 `page`, `size`만 받습니다.
+`q`는 장소명 부분 검색(대소문자 무시)입니다. `category`, `region`은 **아직 구현되지 않았습니다.**
 
 응답 `200`: `Place` 목록(페이지 형식).
 
@@ -238,15 +238,15 @@ Sep 29, 2026 · @Dorothy
 
 ## 스크랩 API
 
-`scraps`, `scrap_contents` 테이블 기준입니다. 모두 인증이 필요하며, 본인 스크랩만 조회·삭제할 수 있습니다(다른 사용자 것은 `404`).
+`scraps`, `scrap_contents`, `scrap_annotations` 테이블 기준입니다. 모두 인증이 필요하며, 본인 스크랩만 조회·삭제할 수 있습니다(다른 사용자 것은 `404`).
 
 스크랩은 담는 값에 따라 세 종류이고, 중복 규칙이 다릅니다. 같은 장소의 다른 리뷰·다른 글은 계속 저장할 수 있습니다.
 
 | 종류 | 담는 값 | 막는 중복 (`409 ALREADY_EXISTS`) | DB 고유 인덱스 |
 | --- | --- | --- | --- |
-| 장소 찜 | `place_id`만 | 같은 장소를 다시 찜 ("이미 스크랩한 장소입니다.") | `ux_scraps_user_place` |
+| 장소 찜 | `place_id` (`source_type=internal`) | 같은 장소를 다시 찜 ("이미 스크랩한 장소입니다.") | `ux_scraps_user_place` |
 | 리뷰 저장 | `review_id` (+ 그 리뷰의 장소) | 같은 리뷰를 다시 저장 ("이미 스크랩한 리뷰입니다.") | `ux_scraps_user_review` |
-| 외부 글 | `source_url` (+ 연결한 장소) | 미정 (외부 글 스크랩 단계에서 정함) | — |
+| 글 스크랩 | 붙여 넣은 본문 + 고른 장소 (+ 선택: 원문 주소) | 같은 본문을 같은 장소로 다시 저장 ("이미 저장한 글입니다."). 공백만 다른 글도 같은 글. 다른 장소로는 저장 가능 | `ux_scraps_user_place_content` |
 
 | Method | Path | 설명 |
 | --- | --- | --- |
@@ -254,7 +254,11 @@ Sep 29, 2026 · @Dorothy
 | GET | `/api/v1/scraps` | 내 스크랩 목록 |
 | GET | `/api/v1/scraps/{scrap_id}` | 스크랩 상세 + 본문 |
 | PATCH | `/api/v1/scraps/{scrap_id}` | 제목 변경 |
-| DELETE | `/api/v1/scraps/{scrap_id}` | 삭제(본문도 함께 삭제) |
+| DELETE | `/api/v1/scraps/{scrap_id}` | 삭제(본문·라벨도 함께 삭제) |
+| POST | `/api/v1/scraps/place-candidates` | 본문에 이름이 나온 장소 후보 (모델 안 씀) |
+| POST | `/api/v1/scraps/posts` | 글 스크랩 생성 + 분석 |
+| POST | `/api/v1/scraps/{scrap_id}/analyze` | 글 다시 분석 |
+| PUT | `/api/v1/scraps/{scrap_id}/annotations` | 라벨 확정 |
 
 ### POST /api/v1/scraps
 
@@ -306,12 +310,41 @@ Sep 29, 2026 · @Dorothy
 `Scrap` 필드에 `content`가 추가됩니다. 본문이 아직 없으면 `null`입니다.
 
 ```json
-"content": { "content_text": "...", "extraction_method": "html_parse", "fetched_at": "2026-09-29T14:21:03" }
+"content": { "content_text": "...", "extraction_method": "user_paste", "fetched_at": null, "promo_signals": ["쿠폰"], "traveler_context": ["parents"] }
 ```
+
+글 스크랩은 `annotations`도 함께 옵니다: `annotation_id`, `aspect`, `label`(한국어 이름), `attribute`, `sentiment`, `evidence`, `evidence_start`·`evidence_end`(`content_text` 안의 위치), `status`(`suggested` \| `confirmed` \| `rejected`).
 
 ### DELETE /api/v1/scraps/{scrap\_id}
 
 응답 `204`. `scrap_contents`는 FK `ON DELETE CASCADE`로 함께 삭제됩니다.
+
+### POST /api/v1/scraps/place-candidates
+
+`{ "text": "본문" }` → 본문에 이름이 나온 장소 최대 5곳(`place_id`, `name`, `category`, `region`, `hits`), 나온 횟수 순. 띄어쓰기, `by`/`바이`, 지점명("광안점")을 무시하고 비교합니다. 모델을 쓰지 않습니다.
+
+### POST /api/v1/scraps/posts
+
+붙여 넣은 글을 저장하고 바로 분석합니다. 외부 사이트에는 접속하지 않으며, `source_url`은 출처 표시용으로만 저장합니다.
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `text` | string, 20~5000자 | 예 | 글 본문 |
+| `place_id` | int | 예 | 이 글이 평가하는 장소. 여러 장소를 다룬 글은 장소마다 따로 저장 |
+| `title` | string, 최대 300자 | 아니오 | 비우면 본문 첫 줄 |
+| `source_url` | string, `http(s)://` | 아니오 | 원문 주소 |
+
+분석: 고른 장소 이름이 나온 단락과 그 앞뒤 단락을 450자 단위로 묶어 **최대 5개**를 QLoRA로 분석하고, 그 장소 카테고리의 허용 aspect·attribute·감성이면서 근거가 본문에 그대로 있는 라벨만 `suggested`로 저장합니다. 홍보 문구(원고료, 협찬, 쿠폰 등)는 규칙으로 찾아 `promo_signals`에 담습니다.
+
+응답 `201`: `ScrapDetail`(`status=analyzed`). 모델 서버에 연결하지 못하면 글은 저장하고 `status=failed`로 응답합니다. 없는 장소는 `404 PLACE_NOT_FOUND`, 같은 글이면 `409 ALREADY_EXISTS`.
+
+### POST /api/v1/scraps/{scrap\_id}/analyze
+
+이전 라벨(확정 포함)을 지우고 다시 제안합니다. 모델을 쓸 수 없으면 `503 MODEL_UNAVAILABLE`, 글 스크랩이 아니면 `400 INVALID_REQUEST`.
+
+### PUT /api/v1/scraps/{scrap\_id}/annotations
+
+`{ "confirmed": [라벨 id, ...] }` → 고른 라벨은 `confirmed`, 나머지는 `rejected`로 바꾸고 스크랩은 `status=confirmed`가 됩니다. 제외한 라벨도 aspect별 제외율 집계를 위해 지우지 않습니다. 이 스크랩의 라벨이 아니면 `400 INVALID_REQUEST`.
 
 ### POST /api/v1/recommendations (스크랩 비교 추천)
 
@@ -323,6 +356,8 @@ Sep 29, 2026 · @Dorothy
 | `requirements` | string, 최대 500자 | 예 | 예: "부모님과 가는데 계단은 피하고 바다 전망이 좋았으면 해요" |
 
 응답 `200`: `requirements`, `interpreter`(`model` \| `keywords`), `weights`(해석한 aspect와 가중치), `ignored_keywords`(신경 쓰지 않는다고 한 것), `items`(순위, 장소, `fit`, 이유, `strengths`·`cautions`와 근거 구절), `skipped`(장소를 알 수 없어 뺀 스크랩). 내 스크랩이 아니면 `404 SCRAP_NOT_FOUND`.
+
+비교하는 장소에 내가 **확정한 글 스크랩 라벨**이 있으면 리뷰 라벨에 더해 계산합니다. 글 1건은 aspect마다 1표입니다. 같은 aspect를 같은 감성으로 여러 번 말해도 1표, 긍정과 부정을 함께 말하면 중립 1표입니다. 반영한 표 수는 `items[].scrap_votes`에 담고, 다른 사용자의 추천에는 쓰지 않습니다.
 
 ## 데이터 모델
 

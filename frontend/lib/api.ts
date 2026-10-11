@@ -1,6 +1,6 @@
 import type {
-  AnalysisResult, AnalyzeRequest, EvidenceReview, ExperimentMetricRow, FitResult, Place, Page, RecommendationQuery, Scrap,
-  ScrapRecommendation,
+  AnalysisResult, AnalyzeRequest, EvidenceReview, ExperimentMetricRow, FitResult, Place, Page, PlaceCandidate, PostCreate,
+  RecommendationQuery, Scrap, ScrapDetail, ScrapRecommendation,
 } from './api-types';
 
 export class ApiError extends Error {
@@ -73,4 +73,14 @@ export const compareScraps = (scrapIds: number[], requirements: string) =>
   apiRequest<ScrapRecommendation>('/recommendations', json('POST', { scrap_ids: scrapIds, requirements }));
 
 /** 장소 자체를 찜한 스크랩(리뷰·외부 글 스크랩 제외). */
-export const isPlaceScrap = (scrap: Scrap) => scrap.review_id === null && scrap.source_url === null;
+export const isPlaceScrap = (scrap: Scrap) => scrap.source_type === 'internal' && scrap.review_id === null;
+/** 붙여 넣은 글 스크랩. */
+export const isPostScrap = (scrap: Scrap) => scrap.source_type === 'external';
+
+// 글 스크랩. 후보 찾기·검색은 모델을 쓰지 않고, 저장·다시 분석은 QLoRA를 글 1건당 최대 5번 쓴다.
+export const findPlaceCandidates = (text: string) => apiRequest<PlaceCandidate[]>('/scraps/place-candidates', json('POST', { text }));
+export const searchPlaces = (q: string) => apiRequest<Page<Place>>(`/places?${new URLSearchParams({ q, size: '10' })}`);
+export const createPostScrap = (body: PostCreate) => apiRequest<ScrapDetail>('/scraps/posts', json('POST', body));
+export const reanalyzeScrap = (scrapId: number) => apiRequest<ScrapDetail>(`/scraps/${scrapId}/analyze`, { method: 'POST' });
+export const confirmScrapLabels = (scrapId: number, confirmed: number[]) =>
+  apiRequest<ScrapDetail>(`/scraps/${scrapId}/annotations`, json('PUT', { confirmed }));

@@ -5,7 +5,7 @@ from backend.models.companion import CompanionType, ReviewCompanion
 from backend.models.place import Place
 from backend.models.place_assets import PlaceImage, PlaceTag, Tag
 from backend.models.review import Review
-from backend.models.scrap import Scrap, ScrapContent
+from backend.models.scrap import Scrap, ScrapAnnotation, ScrapContent
 from backend.models.user import User
 
 __all__ = [
@@ -22,6 +22,7 @@ __all__ = [
     "ReviewAnnotation",
     "ReviewCompanion",
     "Scrap",
+    "ScrapAnnotation",
     "ScrapContent",
     "Tag",
     "User",

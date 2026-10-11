@@ -1,7 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import { ApiError, isPlaceScrap } from './api';
-import type { ExperimentMetricRow, Page, Place, PlaceDetail, PlaceProfile, Scrap, User } from './api-types';
+import type { ExperimentMetricRow, Page, Place, PlaceDetail, PlaceProfile, Scrap, ScrapDetail, User } from './api-types';
 import { TOKEN_COOKIE } from './session';
 
 export function backendUrl(path: string): string {
@@ -33,6 +33,7 @@ export const getPlaceProfile = (id: number) => serverRequest<PlaceProfile>(`/pla
 export const getExperimentMetrics = () => serverRequest<ExperimentMetricRow[]>('/experiments');
 
 export const getMyScraps = (page: number, size: number) => serverRequest<Page<Scrap>>(`/scraps?page=${page}&size=${size}`);
+export const getScrapDetail = (scrapId: number) => serverRequest<ScrapDetail>(`/scraps/${scrapId}`);
 
 /** 이 장소를 찜한 스크랩의 id. 찜하지 않았으면 null. */
 export async function getPlaceScrapId(placeId: number): Promise<number | null> {

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -59,7 +60,52 @@ class ScrapContentRead(BaseModel):
     content_text: str | None
     extraction_method: str | None
     fetched_at: datetime | None
+    promo_signals: list[str] = []  # 본문에서 찾은 홍보 문구 (원고료, 협찬 등)
+    traveler_context: list[str] = []
+
+
+class ScrapAnnotationRead(BaseModel):
+    annotation_id: int
+    aspect: str
+    label: str  # aspect의 한국어 이름
+    attribute: str
+    sentiment: str
+    evidence: str
+    evidence_start: int  # content_text 안의 위치
+    evidence_end: int
+    status: Literal["suggested", "confirmed", "rejected"]
 
 
 class ScrapDetail(ScrapRead):
     content: ScrapContentRead | None = None
+    annotations: list[ScrapAnnotationRead] = []  # 글 스크랩만
+
+
+MAX_POST_CHARS = 5000
+
+
+class PostCreate(BaseModel):
+    """붙여 넣은 글 스크랩. 원문 주소는 출처로만 저장하고 가져오지 않는다."""
+
+    text: str = Field(min_length=20, max_length=MAX_POST_CHARS)
+    place_id: int = Field(gt=0)
+    title: str | None = Field(default=None, max_length=300)
+    source_url: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def check_url(self) -> "PostCreate":
+        if self.source_url and not self.source_url.startswith(("http://", "https://")):
+            raise ValueError("원문 주소는 http:// 또는 https://로 시작해야 합니다.")
+        return self
+
+
+class PlaceCandidatesRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=MAX_POST_CHARS)
+
+
+class PlaceCandidate(ScrapPlace):
+    hits: int  # 본문에서 이 장소 이름이 나온 횟수
+
+
+class AnnotationConfirm(BaseModel):
+    confirmed: list[int] = Field(max_length=500)  # 확정할 라벨 id. 나머지는 제외로 남긴다

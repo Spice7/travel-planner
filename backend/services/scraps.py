@@ -6,10 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models.scrap import Scrap
 from backend.repositories import scraps as scrap_repository
 from backend.schemas.scraps import (
-    ScrapContentRead, ScrapCreate, ScrapDetail, ScrapPage, ScrapPlace, ScrapRead, ScrapUpdate,
+    ScrapAnnotationRead, ScrapContentRead, ScrapCreate, ScrapDetail, ScrapPage, ScrapPlace, ScrapRead, ScrapUpdate,
 )
+from backend.services.recommendations import label
 
-Target = Literal["place", "review"]
+Target = Literal["place", "review", "post"]
 
 
 class DuplicateScrap(Exception):
@@ -79,9 +80,18 @@ async def get_scrap(session: AsyncSession, *, scrap_id: int, user_id: int) -> Sc
     if scrap is None:
         return None
     content = await scrap_repository.get_content(session, scrap_id)
+    annotations = [
+        ScrapAnnotationRead(
+            annotation_id=a.annotation_id, aspect=aspect, label=label(aspect), attribute=a.attribute_value,
+            sentiment=a.sentiment, evidence=a.evidence_text, evidence_start=a.evidence_start,
+            evidence_end=a.evidence_end, status=a.status,
+        )
+        for a, aspect in await scrap_repository.annotations(session, scrap_id)
+    ] if scrap.content_hash is not None else []
     return ScrapDetail(
         **(await _with_places(session, [scrap]))[0].model_dump(),
         content=ScrapContentRead.model_validate(content) if content is not None else None,
+        annotations=annotations,
     )
 
 

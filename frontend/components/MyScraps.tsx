@@ -3,11 +3,12 @@
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { compareScraps, deleteScrap } from '@/lib/api';
+import { compareScraps, deleteScrap, isPostScrap } from '@/lib/api';
 import type { AspectScore, Page, Scrap, ScrapRecommendation } from '@/lib/api-types';
 
 const categoryName: Record<string, string> = { hotel: '숙소', restaurant: '식당', attraction: '관광지' };
 const MIN_COMPARE = 2;
+const postStatus: Record<string, string> = { analyzed: '확인 필요', confirmed: '확정', failed: '분석 실패' };
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
 
@@ -57,6 +58,7 @@ export default function MyScraps({ data }: { data: Page<Scrap> }) {
         <span />
       </header>
       <div className="scraps">
+        <Link href="/scraps/new" className="post-link">+ 글 스크랩하기 <small>블로그·리뷰 글을 붙여 넣어 장소 평가로 저장</small></Link>
         {!scraps.length ? (
           <p className="muted">아직 스크랩한 장소가 없어요. <Link href="/places" className="link">장소 둘러보기</Link></p>
         ) : <>
@@ -65,8 +67,9 @@ export default function MyScraps({ data }: { data: Page<Scrap> }) {
             <li key={scrap.scrap_id} className="scrap-row">
               <input type="checkbox" aria-label={`${scrap.place?.name ?? scrap.title} 선택`}
                 checked={selected.includes(scrap.scrap_id)} onChange={() => toggle(scrap.scrap_id)} />
-              <Link href={scrap.place_id ? `/place/${scrap.place_id}` : '#'}>
-                <b>{scrap.place?.name ?? scrap.title ?? `스크랩 #${scrap.scrap_id}`}</b>
+              <Link href={isPostScrap(scrap) ? `/scraps/${scrap.scrap_id}` : scrap.place_id ? `/place/${scrap.place_id}` : '#'}>
+                <b>{isPostScrap(scrap) && <span className="badge">글 · {postStatus[scrap.status] ?? scrap.status}</span>}{scrap.place?.name ?? scrap.title ?? `스크랩 #${scrap.scrap_id}`}</b>
+                {isPostScrap(scrap) && scrap.title && <small>{scrap.title}</small>}
                 <small>{scrap.place ? `${categoryName[scrap.place.category] ?? scrap.place.category}${scrap.place.region ? ` · ${scrap.place.region}` : ''} · ` : ''}{formatDate(scrap.created_at)} 저장</small>
               </Link>
               <button type="button" onClick={() => remove(scrap.scrap_id)}>삭제</button>
@@ -98,6 +101,7 @@ export default function MyScraps({ data }: { data: Page<Scrap> }) {
               <span className="why">{item.reason}</span>
               <Factor title="강점" scores={item.strengths} />
               <Factor title="주의" scores={item.cautions} />
+              {item.scrap_votes > 0 && <span className="why">내 글 스크랩 근거 {item.scrap_votes}표 반영</span>}
             </Link>
           ))}</div> : <p className="muted">비교할 수 있는 장소가 없어요.</p>}
           {result.skipped.map((s) => <p key={s.scrap_id} className="muted">{s.reason}</p>)}

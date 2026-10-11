@@ -23,14 +23,15 @@ def _place_fields(place: Place, category: str, district: str | None, region: str
     }
 
 
-async def list_places(session: AsyncSession, *, page: int, size: int) -> PlacePage:
-    rows = await place_repository.list_places(session, limit=size, offset=(page - 1) * size)
+async def list_places(session: AsyncSession, *, page: int, size: int, q: str | None = None) -> PlacePage:
+    """q가 있으면 장소명에 q가 들어간 장소만."""
+    rows = await place_repository.list_places(session, limit=size, offset=(page - 1) * size, q=q)
     items = [
         PlaceListItem(**_place_fields(place, category, district, region),
                       main_image_url=main_image_url, review_count=review_count)
         for place, category, district, region, review_count, main_image_url in rows
     ]
-    return PlacePage(items=items, page=page, size=size, total=await place_repository.count_places(session))
+    return PlacePage(items=items, page=page, size=size, total=await place_repository.count_places(session, q))
 
 
 async def get_place_detail(session: AsyncSession, place_id: int) -> PlaceDetailRead | None:

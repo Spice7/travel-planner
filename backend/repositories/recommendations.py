@@ -8,7 +8,7 @@ from backend.models.aspect import Aspect
 from backend.models.catalog import District, PlaceCategory, Region
 from backend.models.place import Place
 from backend.models.review import Review
-from backend.models.scrap import Scrap
+from backend.models.scrap import Scrap, ScrapAnnotation
 
 
 @dataclass(frozen=True)
@@ -130,3 +130,17 @@ async def evidence(session: AsyncSession, place_ids: list[int]) -> dict[tuple[in
         )
     )
     return {(place_id, aspect, sentiment): text for place_id, aspect, sentiment, text in rows}
+
+
+async def scrap_labels(session: AsyncSession, *, user_id: int, place_ids: list[int]) -> list[tuple[int, int, str, str, str]]:
+    """이 사용자가 확정한 글 스크랩 라벨: (place_id, scrap_id, aspect_name, sentiment, evidence_text)."""
+    if not place_ids:
+        return []
+    rows = await session.execute(
+        select(Scrap.place_id, Scrap.scrap_id, Aspect.aspect_name, ScrapAnnotation.sentiment, ScrapAnnotation.evidence_text)
+        .join(ScrapAnnotation, ScrapAnnotation.scrap_id == Scrap.scrap_id)
+        .join(Aspect, Aspect.aspect_id == ScrapAnnotation.aspect_id)
+        .where(Scrap.user_id == user_id, Scrap.place_id.in_(place_ids), ScrapAnnotation.status == "confirmed")
+        .order_by(ScrapAnnotation.evidence_start)
+    )
+    return [tuple(row) for row in rows]

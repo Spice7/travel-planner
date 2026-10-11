@@ -407,6 +407,31 @@ async def interpret_requirements(text: str, categories: list[str], client: Ollam
     return ordered, sorted(label(a) for a in ignored), "model"
 
 
+def scrap_votes(labels: list[tuple[int, int, str, str, str]]) -> tuple[
+    dict[tuple[int, str, str], int], dict[tuple[int, str, str], str], dict[int, int],
+]:
+    """확정한 글 스크랩 라벨을 표로 바꾼다: (표, 대표 근거, 장소별 표 수).
+
+    글 1건은 aspect마다 1표다. 같은 aspect를 같은 감성으로 여러 번 말해도 1표, 긍정과 부정을 함께 말하면
+    중립 1표로 센다. 긴 글이 같은 말을 반복해 리뷰가 적은 장소의 점수를 휘두르지 않게 한다.
+    """
+    sentiments: dict[tuple[int, int, str], set[str]] = defaultdict(set)
+    evidence: dict[tuple[int, str, str], str] = {}
+    for place_id, scrap_id, aspect, sentiment, text in labels:
+        sentiments[(place_id, scrap_id, aspect)].add(sentiment)
+        evidence.setdefault((place_id, aspect, sentiment), text)
+    votes: dict[tuple[int, str, str], int] = defaultdict(int)
+    per_place: dict[int, int] = defaultdict(int)
+    for (place_id, _, aspect), said in sentiments.items():
+        if {"positive", "negative"} <= said or not said & {"positive", "negative"}:
+            vote = "neutral"
+        else:
+            vote = "positive" if "positive" in said else "negative"
+        votes[(place_id, aspect, vote)] += 1
+        per_place[place_id] += 1
+    return dict(votes), evidence, dict(per_place)
+
+
 def goodness(counts: dict[str, int]) -> tuple[float, int]:
     """(0~100 만족도, 언급 수)."""
     mentions = sum(counts.values())
@@ -464,6 +489,11 @@ async def recommend(session: AsyncSession, *, user_id: int, request: Recommendat
     counts: dict[int, dict[str, dict[str, int]]] = defaultdict(lambda: defaultdict(dict))
     for place_id, aspect, sentiment, count in await recommendation_repository.sentiment_counts(session, place_ids):
         counts[place_id][aspect][sentiment] = count
+    # 이 사용자가 확정한 글 스크랩 라벨을 장소의 추가 근거로 더한다 (다른 사용자의 추천에는 쓰지 않는다).
+    votes, scrap_evidence, scrap_vote_counts = scrap_votes(
+        await recommendation_repository.scrap_labels(session, user_id=user_id, place_ids=place_ids))
+    for (place_id, aspect, sentiment), n in votes.items():
+        counts[place_id][aspect][sentiment] = counts[place_id][aspect].get(sentiment, 0) + n
 
     items: list[RecommendationItem] = []
     for place_id in place_ids:
@@ -478,7 +508,8 @@ async def recommend(session: AsyncSession, *, user_id: int, request: Recommendat
             value, mentions = goodness(place_counts[aspect])
             sentiment = "positive" if value >= 50 else "negative"
             score = AspectScore(aspect=aspect, label=label(aspect), goodness=round(value, 1), mentions=mentions,
-                                evidence=evidence.get((place_id, aspect, sentiment)))
+                                evidence=evidence.get((place_id, aspect, sentiment))
+                                or scrap_evidence.get((place_id, aspect, sentiment)))
             scores.append((score, weight))
 
         total = sum(weight for _, weight in scores)
@@ -490,6 +521,7 @@ async def recommend(session: AsyncSession, *, user_id: int, request: Recommendat
             rank=0, place_id=place_id, place_name=name, category=category, scrap_ids=place_scraps[place_id],
             fit=round(fit, 1), matched=matched, review_count=reviews.get(place_id, 0),
             reason=_reason(strengths, cautions, matched), strengths=strengths, cautions=cautions,
+            scrap_votes=scrap_vote_counts.get(place_id, 0),
         ))
 
     # 요구사항과 관련된 리뷰가 있는 장소를 먼저, 그 안에서 fit 순. 관련 리뷰가 없는 장소는 리뷰 전반 점수로 뒤에 둔다.

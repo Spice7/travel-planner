@@ -21,8 +21,9 @@ async def list_places(
     session: Session,
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=100)] = 20,
+    q: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
 ) -> PlacePage:
-    return await place_service.list_places(session, page=page, size=size)
+    return await place_service.list_places(session, page=page, size=size, q=q)
 
 
 @router.get("/{place_id}", response_model=PlaceDetailRead)

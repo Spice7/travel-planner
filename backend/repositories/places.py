@@ -20,7 +20,11 @@ def _place_info_query() -> Select:
     )
 
 
-async def list_places(session: AsyncSession, *, limit: int, offset: int) -> list[tuple]:
+def _name_filter(query: Select, q: str | None) -> Select:
+    return query.where(Place.place_name.icontains(q, autoescape=True)) if q else query
+
+
+async def list_places(session: AsyncSession, *, limit: int, offset: int, q: str | None = None) -> list[tuple]:
     """(Place, category_code, district_name, region_code, 리뷰 수, 대표 이미지 URL)."""
     review_count = select(func.count()).select_from(Review).where(Review.place_id == Place.place_id).scalar_subquery()
     main_image_url = (
@@ -31,14 +35,14 @@ async def list_places(session: AsyncSession, *, limit: int, offset: int) -> list
         .scalar_subquery()
     )
     rows = await session.execute(
-        _place_info_query().add_columns(review_count, main_image_url)
+        _name_filter(_place_info_query().add_columns(review_count, main_image_url), q)
         .order_by(Place.place_id).limit(limit).offset(offset)
     )
     return [tuple(row) for row in rows]
 
 
-async def count_places(session: AsyncSession) -> int:
-    return await session.scalar(select(func.count()).select_from(Place)) or 0
+async def count_places(session: AsyncSession, q: str | None = None) -> int:
+    return await session.scalar(_name_filter(select(func.count()).select_from(Place), q)) or 0
 
 
 async def get_place(session: AsyncSession, place_id: int) -> Place | None:

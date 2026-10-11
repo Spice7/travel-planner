@@ -76,6 +76,23 @@ export type Scrap = {
   updated_at: string;
   place: ScrapPlace | null;
 };
+export type ScrapAnnotation = {
+  annotation_id: number;
+  aspect: string;
+  label: string;
+  attribute: string;
+  sentiment: Sentiment;
+  evidence: string;
+  evidence_start: number;
+  evidence_end: number;
+  status: 'suggested' | 'confirmed' | 'rejected';
+};
+export type ScrapDetail = Scrap & {
+  content: { content_text: string | null; extraction_method: string | null; promo_signals: string[]; traveler_context: string[] } | null;
+  annotations: ScrapAnnotation[];
+};
+export type PlaceCandidate = ScrapPlace & { hits: number };
+export type PostCreate = { text: string; place_id: number; title: string | null; source_url: string | null };
 export type AspectScore = { aspect: string; label: string; goodness: number; mentions: number; evidence: string | null };
 export type ScrapRecommendationItem = {
   rank: number;
@@ -89,6 +106,7 @@ export type ScrapRecommendationItem = {
   reason: string;
   strengths: AspectScore[];
   cautions: AspectScore[];
+  scrap_votes: number;
 };
 export type ScrapRecommendation = {
   requirements: string;

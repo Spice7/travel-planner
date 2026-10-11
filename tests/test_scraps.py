@@ -1,51 +1,18 @@
 import unittest
-from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import httpx
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from backend.api.deps import get_current_user
 from backend.db.session import get_session
 from backend.main import app
-from backend.models.catalog import District, PlaceCategory, Region
-from backend.models.place import Place
-
-# SQLite는 BIGINT 기본 키에 번호를 자동으로 매기지 않아, 같은 열과 같은 조건부 고유 인덱스로 직접 만든다.
-SCRAPS_DDL = [
-    """CREATE TABLE scraps (
-        scrap_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, place_id INTEGER, review_id INTEGER,
-        source_url VARCHAR(1000), title VARCHAR(300), source_type VARCHAR(30) NOT NULL DEFAULT 'internal',
-        status VARCHAR(20) NOT NULL DEFAULT 'ready',
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
-    "CREATE UNIQUE INDEX ux_scraps_user_place ON scraps (user_id, place_id) WHERE review_id IS NULL AND source_url IS NULL",
-    "CREATE UNIQUE INDEX ux_scraps_user_review ON scraps (user_id, review_id) WHERE review_id IS NOT NULL",
-    "CREATE TABLE scrap_contents (scrap_id INTEGER PRIMARY KEY, content_text TEXT, extraction_method VARCHAR(30), fetched_at DATETIME)",
-    # Review 모델의 JSONB는 SQLite에서 만들 수 없어, 스크랩이 쓰는 열만 둔다.
-    "CREATE TABLE reviews (review_id INTEGER PRIMARY KEY, place_id INTEGER)",
-    "INSERT INTO reviews VALUES (101, 31), (102, 31)",
-]
+from scrap_fixtures import build_engine
 
 
 class ScrapApiTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-        async with self.engine.begin() as connection:
-            await connection.run_sync(lambda sync: Region.metadata.create_all(
-                sync, tables=[Region.__table__, District.__table__, PlaceCategory.__table__, Place.__table__]))
-            await connection.execute(Region.__table__.insert(), {"region_id": 1, "region_code": "haeundae", "region_name": "해운대"})
-            await connection.execute(District.__table__.insert(), {"district_id": 1, "region_id": 1, "district_name": "해운대구"})
-            await connection.execute(PlaceCategory.__table__.insert(), {"category_id": 1, "category_code": "attraction", "category_name": "관광지"})
-            now = datetime.now(timezone.utc)
-            await connection.execute(Place.__table__.insert(), [
-                {"place_id": 31, "category_id": 1, "district_id": 1, "source": "t", "source_place_id": "31",
-                 "place_name": "뮤지엄 원", "created_at": now, "updated_at": now},
-                {"place_id": 32, "category_id": 1, "district_id": None, "source": "t", "source_place_id": "32",
-                 "place_name": "지역 없는 곳", "created_at": now, "updated_at": now},
-            ])
-            for statement in SCRAPS_DDL:
-                await connection.execute(text(statement))
+        self.engine = await build_engine()
         sessions = async_sessionmaker(self.engine, expire_on_commit=False)
 
         async def test_session():

@@ -140,6 +140,23 @@ a { color: inherit; text-decoration: none; }
 .compare-form button:disabled { opacity: .45; cursor: default; }
 .factor { margin-right: 8px; }
 
+/* post scraps */
+.auth textarea { width: 100%; padding: 12px 14px; border: 1px solid transparent; border-radius: 12px; background: var(--fill); color: var(--ink); font: inherit; line-height: 1.6; resize: vertical; outline: none; }
+.auth textarea:focus { border-color: var(--ac); background: var(--sf); }
+.notice { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--fill); color: var(--sub); font-size: 13px; }
+.notice.warn { color: var(--err); }
+.post-step { display: grid; gap: 10px; }
+.post-step h2 { margin: 0; font-size: 16px; }
+.post-search { display: flex; gap: 8px; }
+.post-search input { flex: 1; min-width: 0; }
+.auth .post-search button { height: 48px; margin: 0; padding: 0 16px; font-size: 14px; }
+.post-link { display: block; padding: 12px 14px; border: 1px dashed var(--ac); border-radius: 12px; color: var(--ac); font-weight: 600; }
+.post-link small { display: block; color: var(--faint); font-weight: 400; font-size: 12px; }
+.badge { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 6px; background: var(--ac-t); color: var(--ac); font-size: 12px; font-weight: 600; vertical-align: 1px; }
+.post-content { margin: 0; white-space: pre-wrap; font-size: 14px; line-height: 1.7; color: var(--sub); }
+.post-content mark { background: var(--ac-t); color: var(--ink); border-radius: 3px; padding: 0 2px; }
+.compare-form button.secondary { background: var(--fill); color: var(--sub); }
+
 /* compare (발표용) */
 .compare { padding: 24px 20px; overflow-y: auto; }
 .compare h1 { font-size: 20px; margin: 0 0 4px; }

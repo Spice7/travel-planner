@@ -36,6 +36,7 @@ class RecommendationItem(BaseModel):
     reason: str
     strengths: list[AspectScore]
     cautions: list[AspectScore]
+    scrap_votes: int = 0  # 반영한 내 글 스크랩 표 수 (글 1건은 aspect마다 1표)
 
 
 class SkippedScrap(BaseModel):
