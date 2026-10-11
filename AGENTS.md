@@ -33,6 +33,13 @@ Replies, 💡 explanations and commit messages stay Korean.
 
 - In scope: review extraction, per-place Review Profiles aggregated in
   Python/SQL, and the Base vs LoRA vs QLoRA comparison.
+- Also in scope (personal fork): accounts and scraps. Users bookmark places or
+  reviews and compare their scraps against free-text requirements. External-post
+  scraps are text the user pastes, or one page fetched on the user's request from
+  a site whose robots.txt allows it; the QLoRA model labels it, the user confirms
+  the labels, and they feed only that user's recommendations.
+- Never fetch Naver Blog pages (its robots.txt forbids AI/RAG bots); ask for pasted
+  text instead. Never train on scraped or pasted posts; use synthetic data.
 - Future extensions, built only on explicit request: itinerary generation,
   location and travel-time calculation (Google Maps API), the clarifying-question
   planner, and a Validator.
@@ -61,8 +68,17 @@ Replies, 💡 explanations and commit messages stay Korean.
 
 ## Verification
 
-No test suite or linter is configured yet. Until one is, run the changed code
-with `uv run` and report what you ran and its output.
+- `uv run python -m unittest discover -s tests` runs the backend tests; they mock
+  the model and use SQLite, so no GPU or real DB is needed. No linter is configured.
+- Frontend, from `frontend/`: `npx tsc --noEmit` and `npx next build`.
+- A check that calls the Ollama models uses the GPU: state the number of calls
+  first and keep it to a few (GET /recommendations calls the model once per place).
+- Report what you ran and its output.
+
+## Database
+
+DB structure changes go in `backend/db/migrations/NNN_*.sql`, written to be safe
+to re-run, applied after restoring the dump, and mirrored in `docs/db_schema.sql`.
 
 ## Commits
 

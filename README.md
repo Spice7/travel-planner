@@ -271,6 +271,8 @@ psql -h localhost -U <아이디> -d postDB -v ON_ERROR_STOP=1 -f docs/dumps/<덤
 psql -h localhost -U <아이디> -d postDB -v ON_ERROR_STOP=1 -f backend/db/migrations/001_scraps_dedup.sql
 ```
 
+마이그레이션은 다시 적용해도 안전하게 작성되어 있어, 이미 반영된 덤프(2026-10-11 이후 생성)에 적용해도 됩니다.
+
 ### 2. 설정
 
 ```bash
@@ -322,7 +324,9 @@ uv run --package tripfit-model python -m evaluation.run_pipeline --config evalua
 
 ## 🔮 향후 확장
 
-현재 범위는 **리뷰 구조화 · Review Profile · 조건 기반 추천 · 모델 비교**입니다. 아래는 요청 시에만 구현하는 확장입니다.
+현재 범위는 **리뷰 구조화 · Review Profile · 조건 기반 추천 · 모델 비교 · 로그인과 스크랩**입니다. 스크랩은 장소 찜과 스크랩한 장소끼리의 비교 추천까지 동작하고, 외부 글 스크랩(본문 붙여 넣기 또는 허용된 사이트의 글 한 건 → QLoRA 분석 → 사용자 확인 → 그 사용자의 추천에만 반영)을 진행 중입니다. 네이버 블로그는 robots.txt가 AI·RAG 목적의 봇 접근을 금지해 본문 붙여 넣기로만 받습니다.
+
+아래는 요청 시에만 구현하는 확장입니다.
 
 | 단계 | 내용 | 핵심 기술 |
 | --- | --- | --- |
