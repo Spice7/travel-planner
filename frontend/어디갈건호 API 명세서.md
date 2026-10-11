@@ -4,12 +4,12 @@ Sep 29, 2026 · @Dorothy
 
 ## 개요
 
-어디갈건호 프론트엔드(Next.js)가 호출할 FastAPI 백엔드의 초안 명세입니다. 현재 프론트는 `lib/api.ts`와 `data/*.ts`의 Mock 데이터로 동작하며, 이 명세는 그 Mock을 실제 API로 교체하기 위한 계약입니다. 엔드포인트와 필드는 프론트 타입(`types/*.ts`)과 PostgreSQL 스키마(`db/initdb/01_schema.sql`)를 기준으로 정했습니다.
+어디갈건호 프론트엔드(Next.js)와 FastAPI 백엔드 사이의 API 계약입니다. 프론트 타입은 `frontend/lib/api-types.ts`, DB 스키마는 `docs/db_schema.sql`에 있고, 프론트는 Mock 없이 이 API만 호출합니다.
 
-- **Base URL**: `/api` (Next.js에서 FastAPI로 프록시)
+- **Base URL**: `/api/v1` (브라우저는 Next.js의 `/api/v1/*`를 호출하고, Next.js가 FastAPI의 같은 경로로 넘깁니다)
 - **형식**: 요청·응답 모두 `application/json`, UTF-8
-- **필드 표기**: snake\_case (`types/review.ts`의 방침을 따름)
-- **인증**: 조회 API는 인증 없이 호출 가능, 사용자·스크랩 API는 `Authorization: Bearer <access_token>` 필요
+- **필드 표기**: snake\_case (API와 프론트 타입 모두)
+- **인증**: 조회 API는 인증 없이 호출 가능. 사용자·스크랩 API, 리뷰 분석(`POST /api/v1/analyze`), 스크랩 비교 추천(`POST /api/v1/recommendations`)은 `Authorization: Bearer <access_token>` 필요. 프론트는 토큰을 httpOnly 쿠키에 두고 미들웨어가 이 헤더를 붙입니다
 - **ID**: DB의 BIGINT를 그대로 정수로 반환
 
 ### 공통 에러 응답
@@ -41,16 +41,16 @@ Sep 29, 2026 · @Dorothy
 
 ## 장소 API
 
-장소 탐색(`/discover`)과 장소 상세(`/places/[id]`) 화면이 사용합니다. 모두 인증 없이 호출합니다.
+장소 목록(`/places`)과 장소 상세(`/place/[id]`) 화면이 사용합니다. 모두 인증 없이 호출합니다.
 
-| Method | Path | 설명 | 대체할 Mock |
-| --- | --- | --- | --- |
-| GET | `/api/places` | 장소 목록 | `data/places.ts` |
-| GET | `/api/places/{place_id}` | 장소 상세 + 이미지·태그 | `data/places.ts` |
-| GET | `/api/places/{place_id}/profile` | Place Review Profile(Aspect 집계) | `data/profiles.ts` |
-| GET | `/api/places/{place_id}/evidence` | Aspect별 근거 리뷰 | `data/reviews.ts` |
+| Method | Path | 설명 |
+| --- | --- | --- |
+| GET | `/api/v1/places` | 장소 목록 |
+| GET | `/api/v1/places/{place_id}` | 장소 상세 + 이미지·태그 |
+| GET | `/api/v1/places/{place_id}/profile` | Place Review Profile(Aspect 집계) |
+| GET | `/api/v1/places/{place_id}/evidence` | Aspect별 근거 리뷰 |
 
-### GET /api/places
+### GET /api/v1/places
 
 | Query | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
@@ -58,6 +58,8 @@ Sep 29, 2026 · @Dorothy
 | `region` | `haeundae` \| `gwangan` \| `seomyeon` \| `wondo` \| `west` | 아니오 | 지역 코드(`regions.region_code`) |
 | `q` | string | 아니오 | 장소명 부분 검색 |
 | `page`, `size` | int | 아니오 | 페이지네이션 |
+
+`category`, `region`, `q`는 **아직 구현되지 않았습니다.** 지금은 `page`, `size`만 받습니다.
 
 응답 `200`: `Place` 목록(페이지 형식).
 
@@ -82,11 +84,11 @@ Sep 29, 2026 · @Dorothy
 }
 ```
 
-### GET /api/places/{place\_id}
+### GET /api/v1/places/{place\_id}
 
 응답 `200`: `Place` 필드에 `images`(`image_url`, `is_main`, `sort_order`)와 `tags`(`category`, `tag_name`)가 추가됩니다. 없는 ID면 `404 PLACE_NOT_FOUND`.
 
-### GET /api/places/{place\_id}/profile
+### GET /api/v1/places/{place\_id}/profile
 
 리뷰 구조화 결과(`review_annotations`)를 장소 단위로 집계한 값입니다. `share`는 해당 polarity로 언급한 리뷰 비율(%), `ratio`와 `context_satisfaction`도 %입니다.
 
@@ -102,7 +104,7 @@ Sep 29, 2026 · @Dorothy
 }
 ```
 
-### GET /api/places/{place\_id}/evidence
+### GET /api/v1/places/{place\_id}/evidence
 
 | Query | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
@@ -128,15 +130,15 @@ Sep 29, 2026 · @Dorothy
 
 ## 리뷰 분석·추천 API
 
-리뷰 분석기(`/analyzer`)와 추천(`/recommendations`), 실험실(`/lab`) 화면이 사용합니다. `POST /api/analyze`만 로그인이 필요하고(모델 GPU 보호), 나머지는 인증 없이 호출합니다.
+리뷰 분석(`/analyzer`), 조건 추천(`/chat`), 모델 비교(`/admin/compare`) 화면이 사용합니다. `POST /api/v1/analyze`만 로그인이 필요하고(모델 GPU 보호), 나머지는 인증 없이 호출합니다.
 
-| Method | Path | 설명 | 대체할 Mock |
-| --- | --- | --- | --- |
-| POST | `/api/analyze` | 리뷰 한 건을 모델로 구조화 | `lib/api.ts`의 `analyzeReview` |
-| GET | `/api/recommendations` | 사용자 조건에 맞는 장소 순위 | `lib/fit.ts` |
-| GET | `/api/experiments` | Base/LoRA/QLoRA 평가 지표 | `data/experiments.ts` |
+| Method | Path | 설명 |
+| --- | --- | --- |
+| POST | `/api/v1/analyze` | 리뷰 한 건을 모델로 구조화 |
+| GET | `/api/v1/recommendations` | 사용자 조건에 맞는 장소 순위 |
+| GET | `/api/v1/experiments` | Base/LoRA/QLoRA 평가 지표 |
 
-### POST /api/analyze
+### POST /api/v1/analyze
 
 요청 본문 (`AnalyzeRequest`)
 
@@ -162,7 +164,7 @@ Sep 29, 2026 · @Dorothy
 - 허용 Aspect·Attribute 값은 `common/common/schema.py`의 `ASPECTS`, `ATTRIBUTES`를 따릅니다.
 - 모델 출력이 JSON 파싱에 실패하면 `422 MODEL_OUTPUT_INVALID`, 모델이 로드되지 않았으면 `503 MODEL_UNAVAILABLE`.
 
-### GET /api/recommendations
+### GET /api/v1/recommendations
 
 프론트 URL 쿼리(`/recommendations?with=parents&walk=low&pri=sea,food&avoid=waiting`)를 그대로 받습니다. LLM이 장소를 고르지 않고, Place Review Profile에 조건별 가중치를 적용해 Fit 점수를 계산합니다.
 
@@ -193,7 +195,7 @@ Sep 29, 2026 · @Dorothy
 ]
 ```
 
-### GET /api/experiments
+### GET /api/v1/experiments
 
 응답 `200`: 평가 파이프라인(`evaluation/`)의 `automatic_metrics.json`을 화면용으로 정리한 `ExperimentMetricRow` 목록. `scores`의 키는 `base`, `lora_gold`, `qlora_gold`, `lora_gs`, `qlora_gs`입니다.
 
@@ -207,18 +209,18 @@ Sep 29, 2026 · @Dorothy
 
 | Method | Path | 인증 | 설명 |
 | --- | --- | --- | --- |
-| POST | `/api/auth/signup` | — | 회원가입 |
-| POST | `/api/auth/login` | — | 로그인, 토큰 발급 |
-| GET | `/api/users/me` | 필요 | 내 정보 |
-| PATCH | `/api/users/me` | 필요 | 이름·비밀번호 변경 |
+| POST | `/api/v1/auth/signup` | — | 회원가입 |
+| POST | `/api/v1/auth/login` | — | 로그인, 토큰 발급 |
+| GET | `/api/v1/users/me` | 필요 | 내 정보 |
+| PATCH | `/api/v1/users/me` | 필요 | 이름·비밀번호 변경 |
 
-### POST /api/auth/signup
+### POST /api/v1/auth/signup
 
 요청: `{ "email": "a@example.com", "password": "8자 이상", "name": "홍길동" }`
 
 응답 `201`: `User`. 이메일이 이미 있으면 `409 ALREADY_EXISTS`.
 
-### POST /api/auth/login
+### POST /api/v1/auth/login
 
 요청: `{ "email": "a@example.com", "password": "..." }`
 
@@ -230,7 +232,7 @@ Sep 29, 2026 · @Dorothy
 
 이메일 또는 비밀번호가 틀리면 구분 없이 `401 UNAUTHORIZED`.
 
-### GET /api/users/me, PATCH /api/users/me
+### GET /api/v1/users/me, PATCH /api/v1/users/me
 
 응답 `200`: `User`. PATCH는 `name`, `password` 중 보낸 필드만 변경하고 `updated_at`을 갱신합니다. `role`은 변경할 수 없습니다.
 
@@ -248,13 +250,13 @@ Sep 29, 2026 · @Dorothy
 
 | Method | Path | 설명 |
 | --- | --- | --- |
-| POST | `/api/scraps` | 스크랩 생성 |
-| GET | `/api/scraps` | 내 스크랩 목록 |
-| GET | `/api/scraps/{scrap_id}` | 스크랩 상세 + 본문 |
-| PATCH | `/api/scraps/{scrap_id}` | 제목 변경 |
-| DELETE | `/api/scraps/{scrap_id}` | 삭제(본문도 함께 삭제) |
+| POST | `/api/v1/scraps` | 스크랩 생성 |
+| GET | `/api/v1/scraps` | 내 스크랩 목록 |
+| GET | `/api/v1/scraps/{scrap_id}` | 스크랩 상세 + 본문 |
+| PATCH | `/api/v1/scraps/{scrap_id}` | 제목 변경 |
+| DELETE | `/api/v1/scraps/{scrap_id}` | 삭제(본문도 함께 삭제) |
 
-### POST /api/scraps
+### POST /api/v1/scraps
 
 `place_id`, `review_id`, `source_url` 중 **최소 하나**는 있어야 합니다(DB 제약 `ck_scraps_target`). 없으면 `400 INVALID_REQUEST`.
 
@@ -289,7 +291,7 @@ Sep 29, 2026 · @Dorothy
 
 `place`는 목록에서 장소를 다시 조회하지 않도록 함께 내리는 요약이며, 장소가 없는 외부 링크는 `null`입니다.
 
-### GET /api/scraps
+### GET /api/v1/scraps
 
 | Query | 설명 |
 | --- | --- |
@@ -299,7 +301,7 @@ Sep 29, 2026 · @Dorothy
 
 응답 `200`: `Scrap` 목록(페이지 형식 `{ items, page, size, total }`).
 
-### GET /api/scraps/{scrap\_id}
+### GET /api/v1/scraps/{scrap\_id}
 
 `Scrap` 필드에 `content`가 추가됩니다. 본문이 아직 없으면 `null`입니다.
 
@@ -307,11 +309,11 @@ Sep 29, 2026 · @Dorothy
 "content": { "content_text": "...", "extraction_method": "html_parse", "fetched_at": "2026-09-29T14:21:03" }
 ```
 
-### DELETE /api/scraps/{scrap\_id}
+### DELETE /api/v1/scraps/{scrap\_id}
 
 응답 `204`. `scrap_contents`는 FK `ON DELETE CASCADE`로 함께 삭제됩니다.
 
-### POST /api/recommendations (스크랩 비교 추천)
+### POST /api/v1/recommendations (스크랩 비교 추천)
 
 로그인이 필요합니다. 내 스크랩의 장소들을 자연어 요구사항으로 비교해 순위를 매깁니다. 요구사항 해석에 파인튜닝 모델을 한 번 쓰고, 모델을 쓸 수 없으면 키워드 규칙으로 대신합니다(`interpreter`).
 
@@ -324,19 +326,19 @@ Sep 29, 2026 · @Dorothy
 
 ## 데이터 모델
 
-응답 객체별 출처 테이블과 프론트 타입의 대응입니다. 집계 객체(`PlaceProfile`, `FitResult`)는 테이블이 아니라 서버가 계산합니다.
+응답 객체별 출처 테이블과 프론트 타입(`frontend/lib/api-types.ts`)의 대응입니다. 집계 객체(`PlaceProfile`, `FitResult`)는 테이블이 아니라 서버가 계산합니다.
 
 | 응답 객체 | DB 테이블 | 프론트 타입 |
 | --- | --- | --- |
-| `Place` | `places` + `place_categories` + `districts` + `regions` + 대표 `place_images` | `types/place.ts` `Place` |
-| `PlaceDetail` | 위 + `place_images`, `place_tags`/`tags` | — (신규) |
-| `PlaceProfile` | `review_annotations` + `aspects` + `review_companions` 집계 | `types/place.ts` `PlaceProfile` |
-| `EvidenceReview` | `reviews` + `review_annotations` + `companion_types` | `types/review.ts` `EvidenceReview` |
-| `AnalysisResult` | 없음(모델 추론 결과) | `types/review.ts` `AnalysisResult` |
-| `FitResult` | `PlaceProfile` + 요청 조건 계산 | `types/place.ts` `FitResult` |
-| `ExperimentMetricRow` | 없음(`evaluation/runs/*/automatic_metrics.json`) | `types/experiment.ts` |
-| `User` | `users` (`password_hash` 제외) | — (신규) |
-| `Scrap` | `scraps` (+ 상세에서 `scrap_contents`) | — (신규) |
+| `Place` | `places` + `place_categories` + `districts` + `regions` + 대표 `place_images` | `Place` |
+| `PlaceDetail` | 위 + `place_images`, `place_tags`/`tags` | `PlaceDetail` |
+| `PlaceProfile` | `review_annotations` + `aspects` + `review_companions` 집계 | `PlaceProfile` |
+| `EvidenceReview` | `reviews` + `review_annotations` + `companion_types` | `EvidenceReview` |
+| `AnalysisResult` | 없음(모델 추론 결과) | `AnalysisResult` |
+| `FitResult` | `PlaceProfile` + 요청 조건 계산 | `FitResult` |
+| `ExperimentMetricRow` | 없음(`evaluation/runs/*/automatic_metrics.json`) | `ExperimentMetricRow` |
+| `User` | `users` (`password_hash` 제외) | `User` |
+| `Scrap` | `scraps` (+ 상세에서 `scrap_contents`, 목록에서 장소 요약) | `Scrap` |
 
 공통 enum 값
 
@@ -352,10 +354,10 @@ Sep 29, 2026 · @Dorothy
 
 구현 전에 팀이 정해야 할 항목입니다.
 
-- [ ] **필드 표기 통일**: `types/review.ts`는 snake\_case지만 `types/place.ts`는 camelCase(`reviewCount`, `placeId`, `contextSatisfaction`)입니다. 이 명세는 snake\_case로 적었으므로 프론 타입을 바꿀지, API에서 camelCase로 내릴지 정해야 합니다.
+- [x] **필드 표기 통일**: 프론트 타입을 `frontend/lib/api-types.ts` 하나로 모았고 API와 같은 snake\_case를 씁니다.
 - [x] **`user_scraps`와 `scraps` 중복**: `scraps`만 사용하고 `user_scraps`는 삭제했습니다(`backend/db/migrations/001_scraps_dedup.sql`).
 - [x] **중복 스크랩**: 장소 찜과 리뷰 저장은 종류별로 `409`로 막습니다(스크랩 API 참고). 외부 글 규칙은 외부 글 스크랩 단계에서 정합니다.
 - [x] **인증 방식**: 백엔드는 JWT Bearer입니다. 프론트는 토큰을 httpOnly 쿠키에 보관하고, Next 미들웨어가 `/api/v1/*` 요청에 `Authorization` 헤더로 붙입니다.
-- [ ] **분석 모델**: 프론 주석은 Qwen3-8B, 평가 설정(`evaluation/config.json`)은 Qwen3-4B QLoRA입니다. `/api/analyze`가 올릴 모델과 GPU 메모리 예산을 정해야 합니다.
-- [ ] **Region 코드**: 프론의 `haeundae` 등 5개 코드가 `regions.region_code`에 같은 값으로 적재돼 있어야 합니다.
+- [x] **분석 모델**: `/api/v1/analyze`는 Ollama 모델을 씁니다. `qlora`는 `OLLAMA_MODEL`(EXAONE 3.5 2.4B QLoRA), `base`는 `OLLAMA_MODEL_BASE`, `lora`는 `OLLAMA_MODEL_LORA`(비어 있으면 503)입니다.
+- [ ] **Region 코드**: 프론의 `haeundae` 등 5개 코드가 `regions.region_code`에 같은 값으로 적재돼 있어야 합니다. 현재 DB에는 `gwangan`, `haeundae`, `wondo`, `BUSAN`만 있고 `seomyeon`, `west`가 없습니다.
 - [ ] **`family` 동행 유형**: 타입에는 있지만 추천 조건 폼(`COMPANIONS`)에는 없습니다.
